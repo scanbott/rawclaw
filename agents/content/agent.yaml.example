@@ -1,0 +1,6 @@
+name: Content
+description: YouTube scripts, LinkedIn posts, carousels, trend research, content calendar
+
+telegram_bot_token_env: CONTENT_BOT_TOKEN
+
+model: claude-sonnet-4-6

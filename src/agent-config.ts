@@ -1,0 +1,53 @@
+import fs from 'fs';
+import path from 'path';
+import yaml from 'js-yaml';
+
+import { PROJECT_ROOT } from './config.js';
+import { readEnvFile } from './env.js';
+
+export interface AgentConfig {
+  name: string;
+  description: string;
+  botTokenEnv: string;
+  botToken: string;
+  model?: string;
+}
+
+export function loadAgentConfig(agentId: string): AgentConfig {
+  const agentDir = path.join(PROJECT_ROOT, 'agents', agentId);
+  const configPath = path.join(agentDir, 'agent.yaml');
+
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`Agent config not found: ${configPath}`);
+  }
+
+  const raw = yaml.load(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+
+  const name = raw['name'] as string;
+  const description = (raw['description'] as string) ?? '';
+  const botTokenEnv = raw['telegram_bot_token_env'] as string;
+  const model = raw['model'] as string | undefined;
+
+  if (!name || !botTokenEnv) {
+    throw new Error(`Agent config ${configPath} must have 'name' and 'telegram_bot_token_env'`);
+  }
+
+  const env = readEnvFile([botTokenEnv]);
+  const botToken = process.env[botTokenEnv] || env[botTokenEnv] || '';
+  if (!botToken) {
+    throw new Error(`Bot token not found: set ${botTokenEnv} in .env`);
+  }
+
+  return { name, description, botTokenEnv, botToken, model };
+}
+
+/** List all configured agent IDs (directories under agents/ with agent.yaml). */
+export function listAgentIds(): string[] {
+  const agentsDir = path.join(PROJECT_ROOT, 'agents');
+  if (!fs.existsSync(agentsDir)) return [];
+  return fs.readdirSync(agentsDir).filter((d) => {
+    if (d.startsWith('_')) return false;
+    const yamlPath = path.join(agentsDir, d, 'agent.yaml');
+    return fs.existsSync(yamlPath);
+  });
+}

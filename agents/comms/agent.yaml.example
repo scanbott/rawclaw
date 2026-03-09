@@ -1,0 +1,6 @@
+name: Comms
+description: All human communication -- email, Slack, WhatsApp, YouTube comments, Skool inbox, LinkedIn DMs
+
+telegram_bot_token_env: COMMS_BOT_TOKEN
+
+model: claude-sonnet-4-6
