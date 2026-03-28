@@ -40,6 +40,11 @@ import {
   getAuditLog,
   getAuditLogCount,
   getRecentBlockedActions,
+  getDbTables,
+  getDbTableNames,
+  getDbTableRows,
+  runReadOnlyQuery,
+  decryptField,
 } from './db.js';
 import { generateContent, parseJsonResponse } from './gemini.js';
 import { getSecurityStatus } from './security.js';
@@ -338,7 +343,7 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     const chatId = c.req.query('chatId') || '';
     const info = getBotInfo();
     return c.json({
-      botName: info.name || 'ClaudeClaw',
+      botName: info.name || 'RawClaw',
       botUsername: info.username || '',
       pid: process.pid,
       chatId: chatId || null,
@@ -379,7 +384,7 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     });
 
     // Include main bot too
-    const mainPidFile = path.join(STORE_DIR, 'claudeclaw.pid');
+    const mainPidFile = path.join(STORE_DIR, 'rawclaw.pid');
     let mainRunning = false;
     if (fs.existsSync(mainPidFile)) {
       try {
@@ -390,7 +395,7 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     }
     const mainStats = getAgentTokenStats('main');
     const allAgents = [
-      { id: 'main', name: 'Main', description: 'Primary ClaudeClaw bot', model: 'claude-opus-4-6', running: mainRunning, todayTurns: mainStats.todayTurns, todayCost: mainStats.todayCost },
+      { id: 'main', name: 'Main', description: 'Primary RawClaw bot', model: 'claude-opus-4-6', running: mainRunning, todayTurns: mainStats.todayTurns, todayCost: mainStats.todayCost },
       ...agents,
     ];
 
@@ -581,6 +586,81 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     const limit = parseInt(c.req.query('limit') || '20', 10);
     const entries = getHiveMindEntries(limit, agentId || undefined);
     return c.json({ entries });
+  });
+
+  // ── Database Explorer endpoints ────────────────────────────────────
+
+  // List all tables with row counts and column info
+  app.get('/api/db/tables', (c) => {
+    const tables = getDbTables();
+    return c.json({ tables });
+  });
+
+  // Get paginated rows from a table
+  app.get('/api/db/tables/:name', (c) => {
+    const tableName = c.req.param('name');
+    // Validate table name against actual tables to prevent SQL injection
+    const validTables = getDbTableNames();
+    if (!validTables.includes(tableName)) {
+      return c.json({ error: 'Unknown table' }, 400);
+    }
+
+    const page = parseInt(c.req.query('page') || '1', 10);
+    const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50', 10)));
+    const sort = c.req.query('sort') || undefined;
+    const order = (c.req.query('order') || 'asc') as 'asc' | 'desc';
+
+    const result = getDbTableRows(tableName, page, limit, sort, order);
+
+    // Attempt decryption on encrypted fields
+    const encryptedFields: Record<string, string[]> = {
+      wa_messages: ['body'],
+      slack_messages: ['body'],
+    };
+    const fieldsToDecrypt = encryptedFields[tableName];
+    if (fieldsToDecrypt) {
+      result.rows = result.rows.map((row) => {
+        const decrypted = { ...row };
+        for (const field of fieldsToDecrypt) {
+          if (typeof decrypted[field] === 'string') {
+            try {
+              decrypted[field] = decryptField(decrypted[field] as string);
+            } catch { /* leave as-is */ }
+          }
+        }
+        return decrypted;
+      });
+    }
+
+    return c.json(result);
+  });
+
+  // Run a read-only SQL query
+  app.get('/api/db/query', (c) => {
+    const sql = (c.req.query('sql') || '').trim();
+    if (!sql) return c.json({ error: 'sql parameter required' }, 400);
+
+    // Only allow SELECT statements
+    if (!/^select\b/i.test(sql)) {
+      return c.json({ error: 'Only SELECT queries are allowed' }, 400);
+    }
+
+    // Block dangerous patterns
+    if (/;\s*(drop|delete|update|insert|alter|create|attach|detach|pragma)/i.test(sql)) {
+      return c.json({ error: 'Only single SELECT queries are allowed' }, 400);
+    }
+
+    try {
+      const result = runReadOnlyQuery(sql + (sql.toLowerCase().includes(' limit ') ? '' : ' LIMIT 1000'));
+      if (result.rowCount > 1000) {
+        result.rows = result.rows.slice(0, 1000);
+        result.rowCount = 1000;
+      }
+      return c.json(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: msg }, 400);
+    }
   });
 
   // ── Chat endpoints ─────────────────────────────────────────────────

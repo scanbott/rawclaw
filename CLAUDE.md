@@ -1,4 +1,4 @@
-# ClaudeClaw
+# RawClaw
 
 <!-- CRITICAL: NEVER commit personal data to this repo. This is a public template.
      Files that MUST remain generic (no real names, paths, vault locations, API keys):
@@ -94,7 +94,7 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel)
 node "$PROJECT_ROOT/dist/schedule-cli.js" create "PROMPT" "CRON"
 ```
 
-**Agent routing:** The schedule-cli auto-detects which agent you are via the `CLAUDECLAW_AGENT_ID` environment variable. Tasks you create will automatically be assigned to your agent. If you need to override, use `--agent <id>`.
+**Agent routing:** The schedule-cli auto-detects which agent you are via the `RAWCLAW_AGENT_ID` environment variable. Tasks you create will automatically be assigned to your agent. If you need to override, use `--agent <id>`.
 
 Common cron patterns:
 - Daily at 9am: `0 9 * * *`
@@ -174,7 +174,7 @@ You have TWO memory systems. Use both before ever saying "I don't remember":
 2. **Persistent memory database**: A SQLite database stores extracted memories, conversation history, and consolidation insights across ALL sessions. This is injected automatically as `[Memory context]` at the top of each message. When [YOUR NAME] asks "do you remember" or "what do we know about X", check:
    - The `[Memory context]` block already in your prompt (extracted facts from past conversations)
    - The `[Conversation history recall]` block (raw exchanges matching the query, if present)
-   - The database directly: `sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "SELECT role, substr(content, 1, 200) FROM conversation_log WHERE agent_id = 'AGENT_ID_HERE' AND content LIKE '%keyword%' ORDER BY created_at DESC LIMIT 10;"`
+   - The database directly: `sqlite3 $(git rev-parse --show-toplevel)/store/rawclaw.db "SELECT role, substr(content, 1, 200) FROM conversation_log WHERE agent_id = 'AGENT_ID_HERE' AND content LIKE '%keyword%' ORDER BY created_at DESC LIMIT 10;"`
 
 **NEVER say "I don't have memory of that" or "each session starts fresh" without checking these sources first.** The memory system exists specifically so you retain knowledge across sessions.
 
@@ -182,10 +182,10 @@ You have TWO memory systems. Use both before ever saying "I don't remember":
 
 ### `convolife`
 When [YOUR NAME] says "convolife", check the remaining context window and report back. Steps:
-1. Get the current session ID: `sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "SELECT session_id FROM sessions LIMIT 1;"`
+1. Get the current session ID: `sqlite3 $(git rev-parse --show-toplevel)/store/rawclaw.db "SELECT session_id FROM sessions LIMIT 1;"`
 2. Query the token_usage table for context size and session stats:
 ```bash
-sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "
+sqlite3 $(git rev-parse --show-toplevel)/store/rawclaw.db "
   SELECT
     COUNT(*)                as turns,
     MAX(context_tokens)     as last_context,
@@ -197,7 +197,7 @@ sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "
 ```
 3. Also get the first turn's context_tokens as baseline (system prompt overhead):
 ```bash
-sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "
+sqlite3 $(git rev-parse --show-toplevel)/store/rawclaw.db "
   SELECT context_tokens as baseline FROM token_usage
   WHERE session_id = '<SESSION_ID>'
   ORDER BY created_at ASC LIMIT 1;
@@ -214,15 +214,15 @@ Keep it short.
 ### `checkpoint`
 When [YOUR NAME] says "checkpoint", save a TLDR of the current conversation to SQLite so it survives a /newchat session reset. Steps:
 1. Write a tight 3-5 bullet summary of the key things discussed/decided in this session
-2. Find the DB path: `$(git rev-parse --show-toplevel)/store/claudeclaw.db`
-3. Get the actual chat_id from: `sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "SELECT chat_id FROM sessions LIMIT 1;"`
+2. Find the DB path: `$(git rev-parse --show-toplevel)/store/rawclaw.db`
+3. Get the actual chat_id from: `sqlite3 $(git rev-parse --show-toplevel)/store/rawclaw.db "SELECT chat_id FROM sessions LIMIT 1;"`
 4. Insert it into the memories DB as a high-salience semantic memory:
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
 python3 -c "
 import sqlite3, time, os, subprocess
 root = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode().strip()
-db = sqlite3.connect(os.path.join(root, 'store', 'claudeclaw.db'))
+db = sqlite3.connect(os.path.join(root, 'store', 'rawclaw.db'))
 now = int(time.time())
 summary = '''[SUMMARY OF CURRENT SESSION HERE]'''
 db.execute('INSERT INTO memories (chat_id, content, sector, salience, created_at, accessed_at) VALUES (?, ?, ?, ?, ?, ?)',

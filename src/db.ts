@@ -276,7 +276,7 @@ function createSchema(database: Database.Database): void {
 
 export function initDatabase(): void {
   fs.mkdirSync(STORE_DIR, { recursive: true });
-  const dbPath = path.join(STORE_DIR, 'claudeclaw.db');
+  const dbPath = path.join(STORE_DIR, 'rawclaw.db');
 
   // Validate encryption key is available before proceeding
   getEncryptionKey();
@@ -1949,4 +1949,60 @@ export function getRecentBlockedActions(limit = 10): AuditLogEntry[] {
   return db.prepare(
     `SELECT * FROM audit_log WHERE blocked = 1 ORDER BY created_at DESC LIMIT ?`,
   ).all(limit) as AuditLogEntry[];
+}
+
+// ── Database Explorer ──────────────────────────────────────────────────
+
+export interface DbTableInfo {
+  name: string;
+  rowCount: number;
+  columns: Array<{ name: string; type: string; notnull: number; pk: number }>;
+}
+
+export function getDbTables(): DbTableInfo[] {
+  const tables = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name`,
+  ).all() as Array<{ name: string }>;
+
+  return tables.map((t) => {
+    const rowCount = (db.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number }).c;
+    const columns = db.prepare(`PRAGMA table_info("${t.name}")`).all() as Array<{ name: string; type: string; notnull: number; pk: number }>;
+    return { name: t.name, rowCount, columns };
+  });
+}
+
+export function getDbTableNames(): string[] {
+  return (db.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name`,
+  ).all() as Array<{ name: string }>).map((t) => t.name);
+}
+
+export function getDbTableRows(
+  tableName: string,
+  page = 1,
+  limit = 50,
+  sort?: string,
+  order: 'asc' | 'desc' = 'asc',
+): { columns: string[]; rows: Record<string, unknown>[]; total: number; page: number; pages: number } {
+  const columns = (db.prepare(`PRAGMA table_info("${tableName}")`).all() as Array<{ name: string }>).map((c) => c.name);
+  const total = (db.prepare(`SELECT COUNT(*) as c FROM "${tableName}"`).get() as { c: number }).c;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const offset = (Math.max(1, Math.min(page, pages)) - 1) * limit;
+
+  let orderClause = '';
+  if (sort && columns.includes(sort)) {
+    const dir = order === 'desc' ? 'DESC' : 'ASC';
+    orderClause = ` ORDER BY "${sort}" ${dir}`;
+  }
+
+  const rows = db.prepare(`SELECT * FROM "${tableName}"${orderClause} LIMIT ? OFFSET ?`).all(limit, offset) as Record<string, unknown>[];
+
+  return { columns, rows, total, page: Math.max(1, Math.min(page, pages)), pages };
+}
+
+export function runReadOnlyQuery(sql: string): { columns: string[]; rows: Record<string, unknown>[]; rowCount: number } {
+  const stmt = db.prepare(sql);
+  const rows = stmt.all() as Record<string, unknown>[];
+  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  return { columns, rows, rowCount: rows.length };
 }

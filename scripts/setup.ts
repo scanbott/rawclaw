@@ -35,7 +35,7 @@ function loadBanner(): string {
   try {
     return fs.readFileSync(path.join(PROJECT_ROOT, 'banner.txt'), 'utf-8');
   } catch {
-    return '\n  ClaudeClaw\n';
+    return '\n  RawClaw\n';
   }
 }
 
@@ -145,17 +145,17 @@ async function main() {
 
   // ── 1. Banner + intro ────────────────────────────────────────────────────
   console.log(`${c.cyan}${c.bold}${loadBanner()}${c.reset}`);
-  console.log(`  ${c.bold}Welcome to ClaudeClaw.${c.reset}`);
+  console.log(`  ${c.bold}Welcome to RawClaw.${c.reset}`);
   console.log();
   info('This wizard will get you set up in about 5 minutes.');
   info('Press Ctrl+C at any time to exit. You can re-run this at any time with: npm run setup');
   console.log();
 
-  // ── 2. What is ClaudeClaw ────────────────────────────────────────────────
-  section('What is ClaudeClaw?');
+  // ── 2. What is RawClaw ────────────────────────────────────────────────
+  section('What is RawClaw?');
 
-  console.log(`  ClaudeClaw bridges your Claude Code CLI to Telegram.`);
-  console.log(`  You message your bot from your phone. ClaudeClaw runs the`);
+  console.log(`  RawClaw bridges your Claude Code CLI to Telegram.`);
+  console.log(`  You message your bot from your phone. RawClaw runs the`);
   console.log(`  ${c.bold}actual${c.reset} ${c.cyan}claude${c.reset} CLI on your computer — with all your skills,`);
   console.log(`  tools, and context — and sends the result back to you.`);
   console.log();
@@ -168,6 +168,7 @@ async function main() {
   bullet('Persistent memory across messages');
   bullet('Scheduled autonomous tasks (cron)');
   bullet('Optional WhatsApp bridge');
+  bullet('Optional Slack integration');
   console.log();
 
   const understood = await confirm('Ready to continue?');
@@ -268,7 +269,7 @@ async function main() {
   // ── 4. What do you want to enable? ──────────────────────────────────────
   section('Choose your features');
 
-  info('ClaudeClaw has several optional features. Tell us what you want.');
+  info('RawClaw has several optional features. Tell us what you want.');
   info('You can always add more later by editing .env and restarting.');
   console.log();
 
@@ -278,13 +279,14 @@ async function main() {
     : false;
   const wantVideo = await confirm('Video analysis? (send video clips → analyzed by Google Gemini)', false);
   const wantWhatsApp = await confirm('WhatsApp bridge? (view and reply to WhatsApp from Telegram)', false);
+  const wantSlack = await confirm('Slack integration? (read and post to Slack channels from Telegram)', false);
 
   // WhatsApp explanation if they said yes
   if (wantWhatsApp) {
     console.log();
     console.log(`  ${c.bold}How the WhatsApp bridge works:${c.reset}`);
     console.log();
-    info('ClaudeClaw uses whatsapp-web.js to connect to your existing WhatsApp');
+    info('RawClaw uses whatsapp-web.js to connect to your existing WhatsApp');
     info('account via the Linked Devices feature (same as WhatsApp Web).');
     console.log();
     info('A separate process (wa-daemon) runs in the background:');
@@ -313,7 +315,7 @@ async function main() {
   // ── 5. Explore the ecosystem ─────────────────────────────────────────────
   section('The Claw ecosystem');
 
-  info('ClaudeClaw is one of several "Claw" projects. You might want to');
+  info('RawClaw is one of several "Claw" projects. You might want to');
   info('look at others for inspiration or to use a different channel:');
   console.log();
   bullet(`${c.bold}NanoClaw${c.reset}  github.com/qwibitai/nanoclaw       — WhatsApp, isolated containers`);
@@ -345,46 +347,46 @@ async function main() {
     }
   }
 
-  // ── 6. Config directory (CLAUDECLAW_CONFIG) ──────────────────────────────
-  section('Config directory (CLAUDECLAW_CONFIG)');
+  // ── 6. Config directory (RAWCLAW_CONFIG) ──────────────────────────────
+  section('Config directory (RAWCLAW_CONFIG)');
 
   info('Personal config files (CLAUDE.md, agent configs) live outside the repo');
-  info('so they are never accidentally committed. Defaults to ~/.claudeclaw');
+  info('so they are never accidentally committed. Defaults to ~/.rawclaw');
   console.log();
 
   const envForConfig = parseEnvFile(path.join(PROJECT_ROOT, '.env'));
   const defaultConfigDir = expandHome(
-    envForConfig.CLAUDECLAW_CONFIG || '~/.claudeclaw',
+    envForConfig.RAWCLAW_CONFIG || '~/.rawclaw',
   );
   info(`Current path: ${defaultConfigDir}`);
   console.log();
 
-  let claudeclawConfigDir = defaultConfigDir;
+  let rawclawConfigDir = defaultConfigDir;
   const changeConfigDir = await confirm('Change this path?', false);
   if (changeConfigDir) {
-    const input = await ask('Config directory', '~/.claudeclaw');
-    claudeclawConfigDir = expandHome(input.trim() || '~/.claudeclaw');
+    const input = await ask('Config directory', '~/.rawclaw');
+    rawclawConfigDir = expandHome(input.trim() || '~/.rawclaw');
   }
 
   // If the chosen directory already exists, notify and let user decide
-  if (fs.existsSync(claudeclawConfigDir)) {
-    const hasClaudeMd = fs.existsSync(path.join(claudeclawConfigDir, 'CLAUDE.md'));
+  if (fs.existsSync(rawclawConfigDir)) {
+    const hasClaudeMd = fs.existsSync(path.join(rawclawConfigDir, 'CLAUDE.md'));
     ok(`Directory already exists${hasClaudeMd ? ' — CLAUDE.md found' : ' — no CLAUDE.md yet'}`);
     const useExisting = await confirm('Use this directory as-is?', true);
     if (!useExisting) {
       const newPath = await ask('Enter a different path');
-      if (newPath.trim()) claudeclawConfigDir = expandHome(newPath.trim());
+      if (newPath.trim()) rawclawConfigDir = expandHome(newPath.trim());
     }
   }
 
   // Create the directory if needed
-  if (!fs.existsSync(claudeclawConfigDir)) {
-    fs.mkdirSync(claudeclawConfigDir, { recursive: true });
-    ok(`Created ${claudeclawConfigDir}`);
+  if (!fs.existsSync(rawclawConfigDir)) {
+    fs.mkdirSync(rawclawConfigDir, { recursive: true });
+    ok(`Created ${rawclawConfigDir}`);
   }
 
   // Ensure CLAUDE.md exists in the config dir (copy from example if needed)
-  const claudeMdDest = path.join(claudeclawConfigDir, 'CLAUDE.md');
+  const claudeMdDest = path.join(rawclawConfigDir, 'CLAUDE.md');
   if (!fs.existsSync(claudeMdDest)) {
     const exampleSrc = path.join(PROJECT_ROOT, 'CLAUDE.md.example');
     if (fs.existsSync(exampleSrc)) {
@@ -425,7 +427,7 @@ async function main() {
   // ── 7. Skills to install ─────────────────────────────────────────────────
   section('Skills you might want');
 
-  info('ClaudeClaw auto-loads every skill in ~/.claude/skills/.');
+  info('RawClaw auto-loads every skill in ~/.claude/skills/.');
   info('Here are the most useful ones to install:');
   console.log();
 
@@ -440,7 +442,7 @@ async function main() {
   if (wantVideo) {
     console.log(`  ${c.bold}Gemini skill (required for video analysis):${c.reset}`);
     console.log();
-    info('ClaudeClaw\'s video analysis uses the gemini-api-dev skill from Google.');
+    info('RawClaw\'s video analysis uses the gemini-api-dev skill from Google.');
     info('It handles text, images, audio, video, function calling, and structured output.');
     info('Install it from: https://github.com/google-gemini/gemini-skills');
     console.log();
@@ -459,8 +461,8 @@ async function main() {
   const envPath = path.join(PROJECT_ROOT, '.env');
   const env: Record<string, string> = fs.existsSync(envPath) ? parseEnvFile(envPath) : {};
 
-  // Persist CLAUDECLAW_CONFIG determined in section 6
-  env.CLAUDECLAW_CONFIG = claudeclawConfigDir;
+  // Persist RAWCLAW_CONFIG determined in section 6
+  env.RAWCLAW_CONFIG = rawclawConfigDir;
 
   let botUsername = '';
   if (env.TELEGRAM_BOT_TOKEN) {
@@ -520,10 +522,42 @@ async function main() {
     if (chatId !== 'skip' && chatId) env.ALLOWED_CHAT_ID = chatId;
   }
 
+  // ── 8b. Slack (optional) ────────────────────────────────────────────────
+  if (wantSlack) {
+    section('Slack integration');
+
+    console.log(`  ${c.bold}How the Slack integration works:${c.reset}`);
+    console.log();
+    info('RawClaw uses a Slack User Token to read and post messages');
+    info('on your behalf. This lets you interact with Slack channels');
+    info('directly from Telegram.');
+    console.log();
+    info('To get your Slack User Token:');
+    bullet('Go to https://api.slack.com/apps');
+    bullet('Create a new app (or select an existing one)');
+    bullet('Go to OAuth & Permissions');
+    bullet('Add the scopes you need (e.g. channels:read, chat:write, users:read)');
+    bullet('Install the app to your workspace');
+    bullet('Copy the User OAuth Token (starts with xoxp-)');
+    console.log();
+
+    if (env.SLACK_USER_TOKEN) {
+      ok('Slack User Token already configured');
+    } else {
+      const token = await ask('Slack User Token (xoxp-...) — Enter to skip');
+      if (token) {
+        env.SLACK_USER_TOKEN = token;
+        ok('Slack User Token saved');
+      } else {
+        info('Skipped. Add SLACK_USER_TOKEN to .env later.');
+      }
+    }
+  }
+
   // ── 9. Security ──────────────────────────────────────────────────────────
   section('Secure your bot');
 
-  info('ClaudeClaw has full access to your machine. If someone gets into');
+  info('RawClaw has full access to your machine. If someone gets into');
   info('your Telegram account, they control the bot. These layers protect you.');
   console.log();
 
@@ -651,7 +685,7 @@ async function main() {
   // ── 11. Optional Claude API key ───────────────────────────────────────────
   section('Claude authentication');
 
-  info('By default, ClaudeClaw uses your existing claude login (Max plan).');
+  info('By default, RawClaw uses your existing claude login (Max plan).');
   info('This is fine for personal use on your own machine.');
   console.log();
   info('Set an API key if you\'re deploying on a server, or want pay-per-token');
@@ -671,7 +705,7 @@ async function main() {
   await sleep(300);
 
   const lines = [
-    '# ClaudeClaw — generated by setup wizard',
+    '# RawClaw — generated by setup wizard',
     '# Edit freely. Re-run: npm run setup',
     '',
     '# ── Required ──────────────────────────────────────────────────',
@@ -679,7 +713,7 @@ async function main() {
     `ALLOWED_CHAT_ID=${env.ALLOWED_CHAT_ID || ''}`,
     '',
     '# ── Config directory (personal config, never committed) ───────',
-    `CLAUDECLAW_CONFIG=${env.CLAUDECLAW_CONFIG || ''}`,
+    `RAWCLAW_CONFIG=${env.RAWCLAW_CONFIG || ''}`,
     '',
     '# ── Claude auth (optional — uses claude login by default) ─────',
     `ANTHROPIC_API_KEY=${env.ANTHROPIC_API_KEY || ''}`,
@@ -691,6 +725,7 @@ async function main() {
     '',
     '# ── Integrations ──────────────────────────────────────────────',
     `GOOGLE_API_KEY=${env.GOOGLE_API_KEY || ''}`,
+    `SLACK_USER_TOKEN=${env.SLACK_USER_TOKEN || ''}`,
     '',
     '# ── Dashboard ─────────────────────────────────────────────────',
     `DASHBOARD_TOKEN=${env.DASHBOARD_TOKEN || ''}`,
@@ -708,7 +743,7 @@ async function main() {
   ];
 
   // Preserve unknown keys
-  const known = new Set(['TELEGRAM_BOT_TOKEN','ALLOWED_CHAT_ID','CLAUDECLAW_CONFIG','ANTHROPIC_API_KEY','GROQ_API_KEY','ELEVENLABS_API_KEY','ELEVENLABS_VOICE_ID','GOOGLE_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','WHATSAPP_ENABLED','DB_ENCRYPTION_KEY','DASHBOARD_TOKEN','DASHBOARD_PORT','DASHBOARD_URL','SECURITY_PIN_HASH','IDLE_LOCK_MINUTES','EMERGENCY_KILL_PHRASE','DESTRUCTIVE_CONFIRM']);
+  const known = new Set(['TELEGRAM_BOT_TOKEN','ALLOWED_CHAT_ID','RAWCLAW_CONFIG','ANTHROPIC_API_KEY','GROQ_API_KEY','ELEVENLABS_API_KEY','ELEVENLABS_VOICE_ID','GOOGLE_API_KEY','SLACK_USER_TOKEN','CLAUDE_CODE_OAUTH_TOKEN','WHATSAPP_ENABLED','DB_ENCRYPTION_KEY','DASHBOARD_TOKEN','DASHBOARD_PORT','DASHBOARD_URL','SECURITY_PIN_HASH','IDLE_LOCK_MINUTES','EMERGENCY_KILL_PHRASE','DESTRUCTIVE_CONFIRM']);
   for (const [k, v] of Object.entries(env)) {
     if (!known.has(k) && v) lines.push(`${k}=${v}`);
   }
@@ -729,7 +764,7 @@ async function main() {
   } else {
     section('Auto-start');
     info('Unknown platform. Start manually: npm start');
-    info('Or use PM2: pm2 start dist/index.js --name claudeclaw && pm2 save');
+    info('Or use PM2: pm2 start dist/index.js --name rawclaw && pm2 save');
   }
 
   // ── macOS permissions warning ──────────────────────────────────────────
@@ -760,7 +795,7 @@ async function main() {
   // ── 15. Multi-agent setup (optional) ────────────────────────────────────
   section('Agent team (optional)');
 
-  info('ClaudeClaw can run specialist agents alongside the main bot.');
+  info('RawClaw can run specialist agents alongside the main bot.');
   info('Each agent is its own Telegram bot with a focused role, its own');
   info('context window, and its own chat on your phone.');
   console.log();
@@ -803,7 +838,7 @@ async function main() {
   // ── 16. Summary ───────────────────────────────────────────────────────────
   console.log();
   console.log(`  ${c.cyan}╔════════════════════════════════════════════╗${c.reset}`);
-  console.log(`  ${c.cyan}║${c.reset}${c.bold}           ClaudeClaw is ready!             ${c.reset}${c.cyan}║${c.reset}`);
+  console.log(`  ${c.cyan}║${c.reset}${c.bold}           RawClaw is ready!             ${c.reset}${c.cyan}║${c.reset}`);
   console.log(`  ${c.cyan}╚════════════════════════════════════════════╝${c.reset}`);
   console.log();
 
@@ -814,6 +849,7 @@ async function main() {
   wantVoiceOut && env.ELEVENLABS_API_KEY ? ok('Voice output: ElevenLabs ✓') : wantVoiceOut ? warn('Voice output: ElevenLabs keys not set') : info('Voice output: not enabled');
   wantVideo && env.GOOGLE_API_KEY ? ok('Video analysis: Gemini ✓') : wantVideo ? warn('Video analysis: GOOGLE_API_KEY not set') : info('Video analysis: not enabled');
   wantWhatsApp ? ok('WhatsApp: run npx tsx scripts/wa-daemon.ts to connect') : info('WhatsApp: not enabled');
+  wantSlack && env.SLACK_USER_TOKEN ? ok('Slack: connected') : wantSlack ? warn('Slack: SLACK_USER_TOKEN not set') : info('Slack: not enabled');
 
   console.log();
   console.log(`  ${c.bold}Start the bot:${c.reset}`);
@@ -825,9 +861,9 @@ async function main() {
   console.log(`  ${c.cyan}npm run status${c.reset}`);
   console.log();
   if (PLATFORM === 'darwin') {
-    info('Logs: tail -f /tmp/claudeclaw.log');
+    info('Logs: tail -f /tmp/rawclaw.log');
   } else if (PLATFORM === 'linux') {
-    info('Logs: journalctl --user -u claudeclaw -f');
+    info('Logs: journalctl --user -u rawclaw -f');
   }
   console.log();
   info('Edit CLAUDE.md any time to change personality, add context, or update skills.');
@@ -839,7 +875,7 @@ async function main() {
 async function setupMacOS() {
   section('Auto-start (macOS)');
 
-  const dest = path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.claudeclaw.app.plist');
+  const dest = path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.rawclaw.app.plist');
   const installed = fs.existsSync(dest);
 
   if (installed) {
@@ -857,7 +893,7 @@ async function setupMacOS() {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.claudeclaw.app</string>
+  <key>Label</key><string>com.rawclaw.app</string>
   <key>ProgramArguments</key>
   <array>
     <string>${process.execPath}</string>
@@ -867,8 +903,8 @@ async function setupMacOS() {
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>5</integer>
-  <key>StandardOutPath</key><string>/tmp/claudeclaw.log</string>
-  <key>StandardErrorPath</key><string>/tmp/claudeclaw.err</string>
+  <key>StandardOutPath</key><string>/tmp/rawclaw.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rawclaw.err</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>NODE_ENV</key><string>production</string>
@@ -881,7 +917,7 @@ async function setupMacOS() {
     fs.writeFileSync(dest, plist, 'utf-8');
     execSync(`launchctl load "${dest}"`, { stdio: 'pipe' });
     s.stop('ok', 'Service installed — starts automatically on login');
-    info('Logs: tail -f /tmp/claudeclaw.log');
+    info('Logs: tail -f /tmp/rawclaw.log');
   } catch {
     s.stop('warn', 'Could not install automatically');
     info(`Manual install: launchctl load "${dest}"`);
@@ -895,16 +931,16 @@ async function setupLinux() {
   const install = await confirm('Install as a systemd user service?');
   if (!install) {
     info('Start manually: npm start');
-    info('Or: pm2 start dist/index.js --name claudeclaw && pm2 save');
+    info('Or: pm2 start dist/index.js --name rawclaw && pm2 save');
     return;
   }
 
   const s = spinner('Installing systemd service...');
   try {
     const serviceDir = path.join(os.homedir(), '.config', 'systemd', 'user');
-    const servicePath = path.join(serviceDir, 'claudeclaw.service');
+    const servicePath = path.join(serviceDir, 'rawclaw.service');
     const service = `[Unit]
-Description=ClaudeClaw Telegram Bot
+Description=RawClaw Telegram Bot
 After=network.target
 
 [Service]
@@ -924,10 +960,10 @@ WantedBy=default.target
     fs.mkdirSync(serviceDir, { recursive: true });
     fs.writeFileSync(servicePath, service, 'utf-8');
     execSync('systemctl --user daemon-reload', { stdio: 'pipe' });
-    execSync('systemctl --user enable claudeclaw', { stdio: 'pipe' });
-    execSync('systemctl --user start claudeclaw', { stdio: 'pipe' });
+    execSync('systemctl --user enable rawclaw', { stdio: 'pipe' });
+    execSync('systemctl --user start rawclaw', { stdio: 'pipe' });
     s.stop('ok', `Service installed at ${servicePath}`);
-    info('Logs: journalctl --user -u claudeclaw -f');
+    info('Logs: journalctl --user -u rawclaw -f');
   } catch {
     s.stop('warn', 'Could not install automatically');
     info('See README.md for manual systemd setup instructions.');
@@ -941,12 +977,12 @@ function setupWindows() {
   warn('Windows detected.');
   console.log();
   info('Option A — WSL2 (recommended):');
-  info('  Install WSL2, clone ClaudeClaw inside the WSL2 filesystem,');
+  info('  Install WSL2, clone RawClaw inside the WSL2 filesystem,');
   info('  and re-run setup. Keep ~/.claude/ inside WSL2, not the Windows mount.');
   console.log();
   info('Option B — PM2 (native Windows):');
   console.log(`  ${c.cyan}npm install -g pm2${c.reset}`);
-  console.log(`  ${c.cyan}pm2 start dist/index.js --name claudeclaw${c.reset}`);
+  console.log(`  ${c.cyan}pm2 start dist/index.js --name rawclaw${c.reset}`);
   console.log(`  ${c.cyan}pm2 save${c.reset}`);
   console.log(`  ${c.cyan}pm2 startup${c.reset}  ${c.gray}# follow the instructions it prints${c.reset}`);
 }

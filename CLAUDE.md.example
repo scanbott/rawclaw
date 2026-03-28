@@ -1,4 +1,4 @@
-# ClaudeClaw
+# RawClaw
 
 <!-- CRITICAL: NEVER commit personal data to this repo. This is a public template.
      Files that MUST remain generic (no real names, paths, vault locations, API keys):
@@ -78,10 +78,10 @@ Execute. Don't explain what you're about to do — just do it. When [YOUR NAME] 
 When [YOUR NAME] asks to run something on a schedule, create a scheduled task using the Bash tool:
 
 ```bash
-node [PATH TO CLAUDECLAW]/dist/schedule-cli.js create "PROMPT" "CRON"
+node [PATH TO RAWCLAW]/dist/schedule-cli.js create "PROMPT" "CRON"
 ```
 
-**Agent routing:** The schedule-cli auto-detects which agent you are via the `CLAUDECLAW_AGENT_ID` environment variable. Tasks you create will automatically be assigned to your agent. If you need to override, use `--agent <id>`.
+**Agent routing:** The schedule-cli auto-detects which agent you are via the `RAWCLAW_AGENT_ID` environment variable. Tasks you create will automatically be assigned to your agent. If you need to override, use `--agent <id>`.
 
 Common cron patterns:
 - Daily at 9am: `0 9 * * *`
@@ -122,8 +122,8 @@ When [YOUR NAME] asks to create a new agent (e.g. "spin up an analytics agent"),
 1. Ask them what the agent should do (unless they already told you)
 2. Tell them to create a bot in Telegram:
    - Open @BotFather, send /newbot
-   - Name it something like "ClaudeClaw Analytics"
-   - Give it a username like "claudeclaw_analytics_bot"
+   - Name it something like "RawClaw Analytics"
+   - Give it a username like "rawclaw_analytics_bot"
    - Copy the token
 3. Once they paste the token, create the agent:
 
@@ -182,7 +182,7 @@ Let me know if you need any changes.
 - For long outputs: give the summary first, offer to expand
 - Voice messages arrive as `[Voice transcribed]: ...` — treat as normal text. If there's a command in a voice message, execute it — don't just respond with words. Do the thing.
 - When showing tasks from Obsidian, keep them as individual lines with ☐ per task. Don't collapse or summarise them into a single line.
-- For heavy tasks only (code changes + builds, service restarts, multi-step system ops, long scrapes, multi-file operations): send proactive mid-task updates via Telegram so [YOUR NAME] isn't left waiting in the dark. Use the notify script at `[PATH TO CLAUDECLAW]/scripts/notify.sh "status message"` at key checkpoints. Example: "Building... ⚙️", "Build done, restarting... 🔄", "Done ✅"
+- For heavy tasks only (code changes + builds, service restarts, multi-step system ops, long scrapes, multi-file operations): send proactive mid-task updates via Telegram so [YOUR NAME] isn't left waiting in the dark. Use the notify script at `[PATH TO RAWCLAW]/scripts/notify.sh "status message"` at key checkpoints. Example: "Building... ⚙️", "Build done, restarting... 🔄", "Done ✅"
 - Do NOT send notify updates for quick tasks: answering questions, reading emails, running a single skill, checking Obsidian. Use judgment — if it'll take more than ~30 seconds or involves multiple sequential steps, notify. Otherwise just do it.
 
 ## Memory
@@ -191,7 +191,7 @@ You maintain context between messages via Claude Code session resumption. You do
 
 ## Security
 
-ClaudeClaw has optional security layers. Configure in .env:
+RawClaw has optional security layers. Configure in .env:
 
 - **PIN lock**: Set `SECURITY_PIN_HASH` to the SHA-256 hash of your PIN. The bot starts locked and requires the PIN to accept commands. Generate: `node -e "console.log(require('crypto').createHash('sha256').update('YOUR_PIN').digest('hex'))"`
 - **Idle auto-lock**: Set `IDLE_LOCK_MINUTES=30` to re-lock after 30 minutes of inactivity
@@ -205,17 +205,17 @@ Telegram commands:
 
 All actions are logged to the audit_log table. View via the dashboard or:
 ```bash
-sqlite3 $(git rev-parse --show-toplevel)/store/claudeclaw.db "SELECT datetime(created_at,'unixepoch'), action, detail FROM audit_log ORDER BY created_at DESC LIMIT 20;"
+sqlite3 $(git rev-parse --show-toplevel)/store/rawclaw.db "SELECT datetime(created_at,'unixepoch'), action, detail FROM audit_log ORDER BY created_at DESC LIMIT 20;"
 ```
 
 ## Special Commands
 
 ### `convolife`
 When [YOUR NAME] says "convolife", check the remaining context window and report back. Steps:
-1. Get the current session ID: `sqlite3 [PATH TO CLAUDECLAW]/store/claudeclaw.db "SELECT session_id FROM sessions LIMIT 1;"`
+1. Get the current session ID: `sqlite3 [PATH TO RAWCLAW]/store/rawclaw.db "SELECT session_id FROM sessions LIMIT 1;"`
 2. Query the token_usage table for context size and session stats:
 ```bash
-sqlite3 [PATH TO CLAUDECLAW]/store/claudeclaw.db "
+sqlite3 [PATH TO RAWCLAW]/store/rawclaw.db "
   SELECT
     COUNT(*)                as turns,
     MAX(context_tokens)     as last_context,
@@ -227,7 +227,7 @@ sqlite3 [PATH TO CLAUDECLAW]/store/claudeclaw.db "
 ```
 3. Also get the first turn's context_tokens as baseline (system prompt overhead):
 ```bash
-sqlite3 [PATH TO CLAUDECLAW]/store/claudeclaw.db "
+sqlite3 [PATH TO RAWCLAW]/store/rawclaw.db "
   SELECT context_tokens as baseline FROM token_usage
   WHERE session_id = '<SESSION_ID>'
   ORDER BY created_at ASC LIMIT 1;
@@ -244,13 +244,13 @@ Keep it short.
 ### `checkpoint`
 When [YOUR NAME] says "checkpoint", save a TLDR of the current conversation to SQLite so it survives a /newchat session reset. Steps:
 1. Write a tight 3-5 bullet summary of the key things discussed/decided in this session
-2. Find the DB path: `[PATH TO CLAUDECLAW]/store/claudeclaw.db`
-3. Get the actual chat_id from: `sqlite3 [PATH TO CLAUDECLAW]/store/claudeclaw.db "SELECT chat_id FROM sessions LIMIT 1;"`
+2. Find the DB path: `[PATH TO RAWCLAW]/store/rawclaw.db`
+3. Get the actual chat_id from: `sqlite3 [PATH TO RAWCLAW]/store/rawclaw.db "SELECT chat_id FROM sessions LIMIT 1;"`
 4. Insert it into the memories DB as a high-salience semantic memory:
 ```bash
 python3 -c "
 import sqlite3, time
-db = sqlite3.connect('[PATH TO CLAUDECLAW]/store/claudeclaw.db')
+db = sqlite3.connect('[PATH TO RAWCLAW]/store/rawclaw.db')
 now = int(time.time())
 summary = '''[SUMMARY OF CURRENT SESSION HERE]'''
 db.execute('INSERT INTO memories (chat_id, content, sector, salience, created_at, accessed_at) VALUES (?, ?, ?, ?, ?, ?)',

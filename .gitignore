@@ -22,7 +22,7 @@ migrations/.applied.json
 
 # Logs
 *.log
-/tmp/claudeclaw.*
+/tmp/rawclaw.*
 
 # macOS
 .DS_Store
@@ -36,7 +36,7 @@ migrations/.applied.json
 # Personal scripts — not for sharing
 scripts/waste-reminder.sh
 
-# Personal config — lives in CLAUDECLAW_CONFIG (default ~/.claudeclaw)
+# Personal config — lives in RAWCLAW_CONFIG (default ~/.rawclaw)
 CLAUDE.md
 agents/*/agent.yaml
 agents/*/CLAUDE.md

@@ -4,7 +4,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import yaml from 'js-yaml';
 
-import { CLAUDECLAW_CONFIG, PROJECT_ROOT, STORE_DIR } from './config.js';
+import { RAWCLAW_CONFIG, PROJECT_ROOT, STORE_DIR } from './config.js';
 import { listAgentIds, loadAgentConfig, resolveAgentDir } from './agent-config.js';
 import { logger } from './logger.js';
 
@@ -167,10 +167,10 @@ export async function createAgent(opts: CreateAgentOpts): Promise<CreateAgentRes
     }
   }
 
-  // Determine agent directory (prefer CLAUDECLAW_CONFIG if it exists)
+  // Determine agent directory (prefer RAWCLAW_CONFIG if it exists)
   let agentDir: string;
-  const externalAgentsDir = path.join(CLAUDECLAW_CONFIG, 'agents');
-  if (fs.existsSync(CLAUDECLAW_CONFIG)) {
+  const externalAgentsDir = path.join(RAWCLAW_CONFIG, 'agents');
+  if (fs.existsSync(RAWCLAW_CONFIG)) {
     agentDir = path.join(externalAgentsDir, id);
   } else {
     agentDir = path.join(PROJECT_ROOT, 'agents', id);
@@ -297,7 +297,7 @@ function generateLaunchdPlist(agentId: string): string {
   const plistDir = path.join(PROJECT_ROOT, 'launchd');
   fs.mkdirSync(plistDir, { recursive: true });
 
-  const label = `com.claudeclaw.${agentId}`;
+  const label = `com.rawclaw.${agentId}`;
   const plistPath = path.join(plistDir, `${label}.plist`);
 
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
@@ -344,11 +344,11 @@ function generateSystemdUnit(agentId: string): string {
   const unitDir = path.join(os.homedir(), '.config', 'systemd', 'user');
   fs.mkdirSync(unitDir, { recursive: true });
 
-  const serviceName = `com.claudeclaw.agent-${agentId}`;
+  const serviceName = `com.rawclaw.agent-${agentId}`;
   const unitPath = path.join(unitDir, `${serviceName}.service`);
 
   const unit = `[Unit]
-Description=ClaudeClaw Agent: ${agentId}
+Description=RawClaw Agent: ${agentId}
 After=network.target
 
 [Service]
@@ -388,7 +388,7 @@ export function activateAgent(agentId: string): ActivationResult {
 }
 
 function activateLaunchd(agentId: string): ActivationResult {
-  const label = `com.claudeclaw.${agentId}`;
+  const label = `com.rawclaw.${agentId}`;
   const templatePlist = path.join(PROJECT_ROOT, 'launchd', `${label}.plist`);
   const destPlist = path.join(os.homedir(), 'Library', 'LaunchAgents', `${label}.plist`);
 
@@ -438,7 +438,7 @@ function activateLaunchd(agentId: string): ActivationResult {
 }
 
 function activateSystemd(agentId: string): ActivationResult {
-  const serviceName = `com.claudeclaw.agent-${agentId}`;
+  const serviceName = `com.rawclaw.agent-${agentId}`;
   try {
     execSync(`systemctl --user daemon-reload`, { stdio: 'ignore' });
     execSync(`systemctl --user enable "${serviceName}"`, { stdio: 'ignore' });
@@ -453,14 +453,14 @@ function activateSystemd(agentId: string): ActivationResult {
 export function deactivateAgent(agentId: string): { ok: boolean; error?: string } {
   try {
     if (os.platform() === 'darwin') {
-      const label = `com.claudeclaw.${agentId}`;
+      const label = `com.rawclaw.${agentId}`;
       const destPlist = path.join(os.homedir(), 'Library', 'LaunchAgents', `${label}.plist`);
       if (fs.existsSync(destPlist)) {
         try { execSync(`launchctl unload "${destPlist}"`, { stdio: 'ignore' }); } catch { /* ok */ }
         fs.unlinkSync(destPlist);
       }
     } else if (os.platform() === 'linux') {
-      const serviceName = `com.claudeclaw.agent-${agentId}`;
+      const serviceName = `com.rawclaw.agent-${agentId}`;
       try {
         execSync(`systemctl --user stop "${serviceName}"`, { stdio: 'ignore' });
         execSync(`systemctl --user disable "${serviceName}"`, { stdio: 'ignore' });
@@ -498,7 +498,7 @@ export function deleteAgent(agentId: string): { ok: boolean; error?: string } {
   try {
     // Remove agent directory (both possible locations)
     for (const baseDir of [
-      path.join(CLAUDECLAW_CONFIG, 'agents'),
+      path.join(RAWCLAW_CONFIG, 'agents'),
       path.join(PROJECT_ROOT, 'agents'),
     ]) {
       const agentDir = path.join(baseDir, agentId);
@@ -508,7 +508,7 @@ export function deleteAgent(agentId: string): { ok: boolean; error?: string } {
     }
 
     // Remove launchd plist template
-    const plistTemplate = path.join(PROJECT_ROOT, 'launchd', `com.claudeclaw.${agentId}.plist`);
+    const plistTemplate = path.join(PROJECT_ROOT, 'launchd', `com.rawclaw.${agentId}.plist`);
     if (fs.existsSync(plistTemplate)) fs.unlinkSync(plistTemplate);
 
     // Remove token from .env
@@ -531,8 +531,8 @@ export function deleteAgent(agentId: string): { ok: boolean; error?: string } {
 export function suggestBotNames(agentId: string): { displayName: string; username: string } {
   const label = agentId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   return {
-    displayName: `ClaudeClaw ${label}`,
-    username: `claudeclaw_${agentId.replace(/-/g, '_')}_bot`,
+    displayName: `RawClaw ${label}`,
+    username: `rawclaw_${agentId.replace(/-/g, '_')}_bot`,
   };
 }
 

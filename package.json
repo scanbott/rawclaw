@@ -1,7 +1,7 @@
 {
-  "name": "claudeclaw",
+  "name": "rawclaw",
   "version": "1.1.0",
-  "description": "Your personal Claude Code assistant, delivered to your phone via Telegram",
+  "description": "Your AI department in a box, delivered to your phone",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

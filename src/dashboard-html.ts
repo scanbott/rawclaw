@@ -4,7 +4,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>ClaudeClaw Mission Control</title>
+<title>RawClaw Mission Control</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
@@ -12,7 +12,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
   .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
   .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
   .pill-active { background: #064e3b; color: #6ee7b7; }
-  .pill-running { background: #1e3a5f; color: #60a5fa; animation: pulse 2s ease-in-out infinite; }
+  .pill-running { background: #0a3622; color: #34d399; animation: pulse 2s ease-in-out infinite; }
   .pill-paused { background: #422006; color: #fbbf24; }
   .last-success { color: #6ee7b7; }
   .last-failed { color: #f87171; }
@@ -23,13 +23,13 @@ export function getDashboardHtml(token: string, chatId: string): string {
   .stat-val { font-size: 24px; font-weight: 700; color: #fff; }
   .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
   .model-picker { position: relative; cursor: pointer; margin-top: 2px; }
-  .model-current { font-size: 11px; color: #8b5cf6; }
+  .model-current { font-size: 11px; color: #028a45; }
   .model-current:hover { color: #a78bfa; }
   .model-menu { position: absolute; top: 18px; left: 0; z-index: 30; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 4px 0; min-width: 110px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
   .model-opt { padding: 6px 14px; font-size: 12px; color: #9ca3af; cursor: pointer; transition: background 0.1s; }
-  .model-opt:hover { background: #2a2a3e; color: #e0e0e0; }
-  .model-active { color: #8b5cf6; }
-  .model-active::before { content: ''; display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #8b5cf6; margin-right: 6px; vertical-align: middle; }
+  .model-opt:hover { background: #1a2a1f; color: #e0e0e0; }
+  .model-active { color: #028a45; }
+  .model-active::before { content: ''; display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #028a45; margin-right: 6px; vertical-align: middle; }
   details summary { cursor: pointer; list-style: none; }
   details summary::-webkit-details-marker { display: none; }
   .fade-text { color: #f87171; }
@@ -66,8 +66,8 @@ export function getDashboardHtml(token: string, chatId: string): string {
   /* Task prompt text */
   .task-prompt { transition: filter 0.2s; cursor: pointer; }
   .device-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
-  .device-mobile { background: #1e3a5f; color: #60a5fa; }
-  .device-desktop { background: #3b1f5e; color: #c084fc; }
+  .device-mobile { background: #0a3622; color: #34d399; }
+  .device-desktop { background: #042f1a; color: #6ee7b7; }
   /* Drawer */
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
   .drawer-overlay.open { opacity: 1; pointer-events: auto; }
@@ -91,8 +91,8 @@ export function getDashboardHtml(token: string, chatId: string): string {
   .info-tooltip::after { content: ''; position: absolute; top: -5px; left: 50%; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 5px solid #252525; }
   .info-tip.active .info-tooltip { opacity: 1; pointer-events: auto; }
   /* Chat FAB */
-  .chat-fab { position: fixed; bottom: 24px; right: 24px; z-index: 60; width: 56px; height: 56px; border-radius: 50%; background: #4f46e5; color: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(79,70,229,0.4); transition: transform 0.15s, background 0.15s; }
-  .chat-fab:hover { transform: scale(1.08); background: #4338ca; }
+  .chat-fab { position: fixed; bottom: 24px; right: 24px; z-index: 60; width: 56px; height: 56px; border-radius: 50%; background: #014421; color: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(1,68,33,0.4); transition: transform 0.15s, background 0.15s; }
+  .chat-fab:hover { transform: scale(1.08); background: #016b35; }
   .chat-fab:active { transform: scale(0.95); }
   .chat-fab-badge { position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center; border: 2px solid #0f0f0f; }
   /* Chat slide-over panel */
@@ -106,14 +106,14 @@ export function getDashboardHtml(token: string, chatId: string): string {
   .chat-agent-tabs { display: flex; gap: 0; background: #141414; border-bottom: 1px solid #2a2a2a; flex-shrink: 0; overflow-x: auto; padding: 0 12px; }
   .chat-agent-tab { padding: 8px 14px; font-size: 12px; font-weight: 600; color: #6b7280; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
   .chat-agent-tab:hover { color: #d4d4d8; }
-  .chat-agent-tab.active { color: #a5b4fc; border-bottom-color: #4f46e5; }
+  .chat-agent-tab.active { color: #6ee7b7; border-bottom-color: #014421; }
   .chat-agent-tab .agent-dot { width: 6px; height: 6px; border-radius: 50%; }
   .chat-agent-tab .agent-dot.live { background: #22c55e; }
   .chat-agent-tab .agent-dot.dead { background: #ef4444; }
   /* Session info bar */
   .chat-session-bar { display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: #111; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; font-size: 11px; color: #6b7280; }
   .chat-session-bar .session-stat { display: flex; align-items: center; gap: 4px; }
-  .chat-session-bar .session-stat-val { color: #a5b4fc; font-weight: 600; }
+  .chat-session-bar .session-stat-val { color: #6ee7b7; font-weight: 600; }
   .chat-session-bar .session-model { background: #1e1e1e; padding: 2px 8px; border-radius: 4px; color: #9ca3af; font-weight: 600; }
   /* Quick actions */
   .chat-quick-actions { display: flex; gap: 6px; padding: 8px 16px; background: #111; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; overflow-x: auto; }
@@ -122,7 +122,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
   .chat-quick-btn.destructive:hover { border-color: #dc2626; color: #fca5a5; }
   .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .chat-bubble { max-width: 90%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.6; word-wrap: break-word; overflow-wrap: anywhere; word-break: break-word; }
-  .chat-bubble-user { background: #3730a3; color: #e0e7ff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .chat-bubble-user { background: #042f1a; color: #d1fae5; align-self: flex-end; border-bottom-right-radius: 4px; }
   .chat-bubble-assistant { background: #1e1e1e; color: #d4d4d8; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #2a2a2a; min-width: 0; }
   .chat-bubble-source { font-size: 10px; color: #6b7280; margin-top: 4px; }
   .chat-bubble code { background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
@@ -130,22 +130,57 @@ export function getDashboardHtml(token: string, chatId: string): string {
   .chat-bubble pre code { background: none; padding: 0; }
   .chat-bubble table { border-collapse: collapse; width: 100%; font-size: 11px; margin: 6px 0; display: block; overflow-x: auto; }
   .chat-bubble th, .chat-bubble td { padding: 3px 6px; border-bottom: 1px solid #2a2a2a; text-align: left; white-space: nowrap; }
-  .chat-bubble th { color: #a5b4fc; font-weight: 600; }
+  .chat-bubble th { color: #6ee7b7; font-weight: 600; }
   .chat-progress-bar { display: none; align-items: center; gap: 10px; padding: 10px 16px; background: #141414; border-top: 1px solid #2a2a2a; flex-shrink: 0; position: relative; overflow: hidden; }
   .chat-progress-bar.active { display: flex; }
-  .chat-progress-pulse { width: 10px; height: 10px; border-radius: 50%; background: #4f46e5; flex-shrink: 0; animation: progressPulse 1.5s ease-in-out infinite; }
+  .chat-progress-pulse { width: 10px; height: 10px; border-radius: 50%; background: #014421; flex-shrink: 0; animation: progressPulse 1.5s ease-in-out infinite; }
   @keyframes progressPulse { 0%,100% { opacity: 0.4; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
   .chat-progress-label { font-size: 13px; color: #9ca3af; }
-  .chat-stop-btn { margin-left: auto; background: none; border: 1px solid #4f46e5; color: #4f46e5; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, color 0.15s; }
-  .chat-stop-btn:hover { background: #4f46e5; color: #fff; }
-  .chat-progress-shimmer { position: absolute; bottom: 0; left: 0; height: 2px; width: 100%; background: linear-gradient(90deg, transparent, #4f46e5, transparent); animation: shimmer 2s ease-in-out infinite; }
+  .chat-stop-btn { margin-left: auto; background: none; border: 1px solid #014421; color: #014421; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, color 0.15s; }
+  .chat-stop-btn:hover { background: #014421; color: #fff; }
+  .chat-progress-shimmer { position: absolute; bottom: 0; left: 0; height: 2px; width: 100%; background: linear-gradient(90deg, transparent, #014421, transparent); animation: shimmer 2s ease-in-out infinite; }
   @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
   .chat-input-area { display: flex; gap: 8px; padding: 12px 16px; background: #141414; border-top: 1px solid #2a2a2a; flex-shrink: 0; }
   .chat-textarea { flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; color: #e0e0e0; padding: 10px 14px; font-size: 14px; resize: none; outline: none; max-height: 120px; font-family: inherit; }
-  .chat-textarea:focus { border-color: #4f46e5; }
-  .chat-send-btn { background: #4f46e5; color: #fff; border: none; border-radius: 12px; padding: 0 16px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.15s; flex-shrink: 0; }
-  .chat-send-btn:hover { background: #4338ca; }
+  .chat-textarea:focus { border-color: #014421; }
+  .chat-send-btn { background: #014421; color: #fff; border: none; border-radius: 12px; padding: 0 16px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.15s; flex-shrink: 0; }
+  .chat-send-btn:hover { background: #016b35; }
   .chat-send-btn:disabled { background: #2a2a2a; color: #666; cursor: not-allowed; }
+  /* Database Explorer */
+  .db-nav-tabs { display: flex; gap: 0; background: #141414; border-bottom: 1px solid #2a2a2a; margin-bottom: 16px; overflow-x: auto; }
+  .db-nav-tab { padding: 10px 20px; font-size: 13px; font-weight: 600; color: #6b7280; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .db-nav-tab:hover { color: #d4d4d8; }
+  .db-nav-tab.active { color: #6ee7b7; border-bottom-color: #014421; }
+  .db-layout { display: grid; grid-template-columns: 200px 1fr; gap: 16px; min-height: 500px; }
+  @media (max-width: 768px) { .db-layout { grid-template-columns: 1fr; } }
+  .db-sidebar { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 8px 0; max-height: 600px; overflow-y: auto; }
+  .db-sidebar-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; cursor: pointer; transition: background 0.1s; font-size: 13px; color: #d4d4d8; }
+  .db-sidebar-item:hover { background: #222; }
+  .db-sidebar-item.active { background: #064e3b; color: #6ee7b7; }
+  .db-sidebar-count { font-size: 11px; color: #6b7280; background: #252525; padding: 1px 6px; border-radius: 4px; }
+  .db-sidebar-item.active .db-sidebar-count { color: #6ee7b7; background: #065f46; }
+  .db-grid-wrapper { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .db-grid-scroll { overflow: auto; flex: 1; max-height: 500px; }
+  .db-grid { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .db-grid th { position: sticky; top: 0; background: #1a1a1a; text-align: left; padding: 8px 12px; font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #333; cursor: pointer; user-select: none; white-space: nowrap; }
+  .db-grid th:hover { color: #d4d4d8; }
+  .db-grid th .sort-arrow { font-size: 9px; margin-left: 4px; opacity: 0.4; }
+  .db-grid th.sorted .sort-arrow { opacity: 1; color: #6ee7b7; }
+  .db-grid td { padding: 6px 12px; border-bottom: 1px solid #1e1e1e; color: #d4d4d8; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
+  .db-grid tr:hover td { background: #222; }
+  .db-grid td.null-val { color: #555; font-style: italic; }
+  .db-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid #2a2a2a; font-size: 12px; color: #6b7280; }
+  .db-page-btn { background: #252525; color: #d4d4d8; border: 1px solid #2a2a2a; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+  .db-page-btn:hover { background: #333; }
+  .db-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .db-query-area { margin-top: 16px; }
+  .db-query-textarea { width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; padding: 10px 14px; font-size: 13px; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; resize: vertical; outline: none; box-sizing: border-box; }
+  .db-query-textarea:focus { border-color: #014421; }
+  .db-query-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .db-run-btn { background: #014421; color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .db-run-btn:hover { background: #016b35; }
+  .db-query-error { color: #f87171; font-size: 12px; margin-top: 6px; }
+  .db-query-info { color: #6b7280; font-size: 12px; }
 </style>
 </head>
 <body class="p-4 select-none">
@@ -156,7 +191,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
 <!-- Top bar -->
 <div class="flex items-center justify-between mb-1">
   <div class="flex items-center gap-3">
-    <h1 class="text-xl font-bold text-white">ClaudeClaw <span style="font-size:13px;font-weight:400;color:#6b7280">Mission Control</span></h1>
+    <h1 class="text-xl font-bold text-white">RawClaw <span style="font-size:13px;font-weight:400;color:#6b7280">Mission Control</span></h1>
     <span id="device-badge" class="device-badge"></span>
   </div>
   <div class="flex items-center gap-3">
@@ -169,6 +204,15 @@ export function getDashboardHtml(token: string, chatId: string): string {
   </div>
 </div>
 <div id="bot-info" class="flex items-center gap-3 mb-4 text-xs text-gray-500" style="display:none"></div>
+
+<!-- Main Navigation Tabs -->
+<div class="db-nav-tabs" style="border-radius:10px;margin-bottom:16px">
+  <button class="db-nav-tab active" onclick="switchMainTab('dashboard',this)">Dashboard</button>
+  <button class="db-nav-tab" onclick="switchMainTab('database',this)">Database</button>
+</div>
+
+<!-- Dashboard View -->
+<div id="main-tab-dashboard">
 
 <!-- Summary Stats Bar -->
 <div id="summary-bar" class="summary-bar" style="display:none">
@@ -195,7 +239,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
   <div class="flex items-center justify-between mb-2">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Agents</h2>
     <div class="flex items-center gap-2">
-      <button onclick="openCreateAgentWizard()" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer">+ New Agent</button>
+      <button onclick="openCreateAgentWizard()" style="background:#014421;color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer">+ New Agent</button>
       <div class="model-picker" onclick="toggleModelPicker(this)" style="display:inline-block">
         <span class="model-current" style="color:#6b7280">Set all <span style="font-size:8px;opacity:0.5">&#9662;</span></span>
         <div class="model-menu" style="display:none;right:0;left:auto">
@@ -223,7 +267,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Tasks</h2>
     <div class="flex gap-2">
       <button onclick="autoAssignAll()" id="auto-assign-all-btn" style="background:#1a1a1a;color:#a78bfa;border:1px solid #2a2a2a;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;display:none">Auto-assign All</button>
-      <button onclick="openMissionModal()" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer">+ New</button>
+      <button onclick="openMissionModal()" style="background:#014421;color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer">+ New</button>
     </div>
   </div>
   <div id="tasks-inbox" class="flex flex-wrap gap-3"></div>
@@ -255,7 +299,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
         <option value="5" selected>Medium</option>
         <option value="10">High</option>
       </select>
-      <button onclick="createMissionTask()" style="flex:1;background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:600;cursor:pointer">Create</button>
+      <button onclick="createMissionTask()" style="flex:1;background:#014421;color:#fff;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:600;cursor:pointer">Create</button>
     </div>
     <div id="mission-error" class="text-red-400 text-xs mt-2" style="display:none"></div>
   </div>
@@ -280,7 +324,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
   </div>
   <!-- Step indicators -->
   <div class="flex gap-2 px-4 mb-3">
-    <div id="caw-step-1-dot" style="flex:1;height:3px;border-radius:2px;background:#4f46e5;transition:background 0.2s"></div>
+    <div id="caw-step-1-dot" style="flex:1;height:3px;border-radius:2px;background:#014421;transition:background 0.2s"></div>
     <div id="caw-step-2-dot" style="flex:1;height:3px;border-radius:2px;background:#2a2a2a;transition:background 0.2s"></div>
     <div id="caw-step-3-dot" style="flex:1;height:3px;border-radius:2px;background:#2a2a2a;transition:background 0.2s"></div>
   </div>
@@ -315,7 +359,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
       </div>
 
       <div id="caw-step1-error" class="text-red-400 text-xs mb-2" style="display:none"></div>
-      <button onclick="cawGoStep2()" style="width:100%;background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer">Next: Set up Telegram bot</button>
+      <button onclick="cawGoStep2()" style="width:100%;background:#014421;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer">Next: Set up Telegram bot</button>
     </div>
 
     <!-- Step 2: BotFather + Token -->
@@ -323,7 +367,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
       <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:14px;margin-bottom:12px">
         <div class="text-xs text-gray-400 font-semibold uppercase mb-2">Create a Telegram bot</div>
         <div class="text-xs text-gray-300 leading-relaxed">
-          1. Open <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">@BotFather</a> in Telegram<br>
+          1. Open <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:#34d399;text-decoration:none">@BotFather</a> in Telegram<br>
           2. Send <code style="background:#222;padding:1px 4px;border-radius:3px">/newbot</code><br>
           3. Name it: <span id="caw-suggested-name" style="color:#a78bfa;cursor:pointer" onclick="copyToClipboard(this.textContent)" title="Click to copy"></span><br>
           4. Username: <span id="caw-suggested-username" style="color:#a78bfa;cursor:pointer" onclick="copyToClipboard(this.textContent)" title="Click to copy"></span><br>
@@ -340,7 +384,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
 
       <div class="flex gap-2 mt-3">
         <button onclick="cawGoStep1()" style="flex:0 0 auto;background:#1a1a1a;color:#9ca3af;border:1px solid #2a2a2a;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer">Back</button>
-        <button id="caw-create-btn" onclick="cawCreate()" style="flex:1;background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;opacity:0.5;pointer-events:none">Create Agent</button>
+        <button id="caw-create-btn" onclick="cawCreate()" style="flex:1;background:#014421;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;opacity:0.5;pointer-events:none">Create Agent</button>
       </div>
       <div id="caw-step2-error" class="text-red-400 text-xs mt-2" style="display:none"></div>
     </div>
@@ -395,7 +439,7 @@ export function getDashboardHtml(token: string, chatId: string): string {
       <div class="text-xs text-gray-600 mt-1">Tap to browse</div>
     </div>
     <div class="card clickable-card text-center" onclick="openPinnedDrawer()" style="cursor:pointer">
-      <div class="stat-val" id="mem-pinned" style="color:#60a5fa">-</div>
+      <div class="stat-val" id="mem-pinned" style="color:#34d399">-</div>
       <div class="stat-label">Pinned</div>
       <div class="text-xs text-gray-600 mt-1">Tap to browse</div>
     </div>
@@ -495,6 +539,45 @@ export function getDashboardHtml(token: string, chatId: string): string {
 </div><!-- end RIGHT COLUMN -->
 
 </div><!-- end grid -->
+
+</div><!-- end main-tab-dashboard -->
+
+<!-- Database View -->
+<div id="main-tab-database" style="display:none">
+  <div class="db-layout">
+    <div class="db-sidebar" id="db-sidebar">
+      <div style="padding:8px 14px;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Tables</div>
+      <div id="db-table-list"><div style="padding:8px 14px;color:#555;font-size:12px">Loading...</div></div>
+    </div>
+    <div>
+      <div class="db-grid-wrapper">
+        <div class="db-grid-scroll" id="db-grid-scroll">
+          <table class="db-grid" id="db-grid">
+            <thead id="db-grid-head"></thead>
+            <tbody id="db-grid-body"><tr><td style="padding:20px;color:#555">Select a table</td></tr></tbody>
+          </table>
+        </div>
+        <div class="db-pagination" id="db-pagination" style="display:none">
+          <span id="db-row-info"></span>
+          <div class="flex items-center gap-2">
+            <button class="db-page-btn" id="db-prev-btn" onclick="dbPrevPage()">&larr; Prev</button>
+            <span id="db-page-info"></span>
+            <button class="db-page-btn" id="db-next-btn" onclick="dbNextPage()">Next &rarr;</button>
+          </div>
+        </div>
+      </div>
+      <div class="db-query-area">
+        <textarea class="db-query-textarea" id="db-query-input" rows="3" placeholder="SELECT * FROM scheduled_tasks WHERE status = 'active' LIMIT 20" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();dbRunQuery()}"></textarea>
+        <div class="db-query-bar">
+          <button class="db-run-btn" onclick="dbRunQuery()">Run Query</button>
+          <span id="db-query-status" class="db-query-info"></span>
+        </div>
+        <div id="db-query-error" class="db-query-error" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div><!-- end main-tab-database -->
+
 </div><!-- end outer wrapper -->
 
 <!-- Memory drill-down drawer -->
@@ -650,7 +733,7 @@ async function openInsightsDrawer() {
     document.getElementById('drawer-body').innerHTML = insights.map(function(c) {
       var date = new Date(c.created_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       return '<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:12px;margin-bottom:8px">' +
-        '<div class="text-xs text-purple-400 mb-1">' + date + '</div>' +
+        '<div class="text-xs text-green-400 mb-1">' + date + '</div>' +
         '<div class="text-sm text-white mb-2">' + escapeHtml(c.insight || c.summary) + '</div>' +
         (c.summary && c.insight ? '<div class="text-xs text-gray-500">' + escapeHtml(c.summary) + '</div>' : '') +
       '</div>';
@@ -756,7 +839,7 @@ async function loadTasks() {
       const agentBadge = t.agent_id && t.agent_id !== 'main' ? '<span class="text-xs text-gray-500 ml-2">[' + t.agent_id + ']</span>' : '';
       const lastStatusIcon = t.last_status === 'success' ? '<span class="last-success" title="Last run succeeded">&#10003;</span> ' : t.last_status === 'failed' ? '<span class="last-failed" title="Last run failed">&#10007;</span> ' : t.last_status === 'timeout' ? '<span class="last-timeout" title="Last run timed out">&#9200;</span> ' : '';
       const lastResult = t.last_result ? '<details class="mt-2"><summary class="text-xs text-gray-500">' + lastStatusIcon + 'Last result</summary><pre class="text-xs text-gray-400 mt-1 whitespace-pre-wrap break-words">' + escapeHtml(t.last_result) + '</pre></details>' : '';
-      const runningInfo = t.status === 'running' && t.started_at ? '<span class="text-xs text-blue-400 ml-2">running for ' + elapsed(t.started_at) + '</span>' : '';
+      const runningInfo = t.status === 'running' && t.started_at ? '<span class="text-xs text-green-400 ml-2">running for ' + elapsed(t.started_at) + '</span>' : '';
       const pauseBtn = t.status === 'active'
         ? '<button data-task="' + t.id + '" data-action="pause" onclick="taskAction(this.dataset.task,this.dataset.action)" title="Pause" style="background:none;border:none;cursor:pointer;color:#fbbf24;font-size:14px;padding:2px 4px">&#9208;</button>'
         : t.status === 'paused' ? '<button data-task="' + t.id + '" data-action="resume" onclick="taskAction(this.dataset.task,this.dataset.action)" title="Resume" style="background:none;border:none;cursor:pointer;color:#6ee7b7;font-size:14px;padding:2px 4px">&#9654;</button>' : '';
@@ -841,7 +924,7 @@ async function loadMemories() {
         data: {
           labels: data.timeline.map(d => d.date.slice(5)),
           datasets: [
-            { label: 'Memories', data: data.timeline.map(d => d.count), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', fill: true, tension: 0.3 }
+            { label: 'Memories', data: data.timeline.map(d => d.count), borderColor: '#028a45', backgroundColor: 'rgba(2,138,69,0.1)', fill: true, tension: 0.3 }
           ]
         },
         options: { responsive: true, plugins: { legend: { labels: { color: '#888', boxWidth: 12 } } }, scales: { y: { ticks: { color: '#666' }, grid: { color: '#222' } }, x: { ticks: { color: '#666', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } } } }
@@ -903,7 +986,7 @@ async function loadTokens() {
         type: 'line',
         data: {
           labels: data.costTimeline.map(d => d.date.slice(5)),
-          datasets: [{ label: 'Turns', data: data.costTimeline.map(d => d.turns), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3, pointRadius: 2 }]
+          datasets: [{ label: 'Turns', data: data.costTimeline.map(d => d.turns), borderColor: '#028a45', backgroundColor: 'rgba(2,138,69,0.1)', fill: true, tension: 0.3, pointRadius: 2 }]
         },
         options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#666' }, grid: { color: '#222' } }, x: { ticks: { color: '#666', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } } } }
       });
@@ -953,7 +1036,7 @@ document.addEventListener('click', function(e) {
 }, true);
 
 // ── Agent & Hive Mind ────────────────────────────────────────────────
-const AGENT_COLORS = { main: '#4f46e5', comms: '#0ea5e9', content: '#f59e0b', ops: '#10b981', research: '#8b5cf6' };
+const AGENT_COLORS = { main: '#014421', comms: '#0ea5e9', content: '#f59e0b', ops: '#10b981', research: '#028a45' };
 
 async function loadAgents() {
   try {
@@ -1065,7 +1148,7 @@ async function toggleAgentDetail(agentId) {
       html += '<div class="text-xs text-gray-400 font-semibold mb-2 uppercase">Recent conversation</div>';
       var sorted = convo.turns.slice().reverse();
       html += sorted.map(function(t) {
-        var role = t.role === 'user' ? '<span style="color:#818cf8">You</span>' : '<span style="color:#6ee7b7">Agent</span>';
+        var role = t.role === 'user' ? '<span style="color:#34d399">You</span>' : '<span style="color:#6ee7b7">Agent</span>';
         var text = t.content.length > 200 ? t.content.slice(0, 200) + '...' : t.content;
         return '<div style="background:#1a1a1a;border-radius:6px;padding:8px;margin-bottom:4px">' +
           '<div class="text-xs" style="margin-bottom:2px">' + role + '</div>' +
@@ -1221,7 +1304,7 @@ function cawShowStep(n) {
   document.getElementById('caw-step-2').style.display = n === 2 ? '' : 'none';
   document.getElementById('caw-step-3').style.display = n === 3 ? '' : 'none';
   for (var i = 1; i <= 3; i++) {
-    document.getElementById('caw-step-' + i + '-dot').style.background = i <= n ? '#4f46e5' : '#2a2a2a';
+    document.getElementById('caw-step-' + i + '-dot').style.background = i <= n ? '#014421' : '#2a2a2a';
   }
   var titles = { 1: 'New Agent', 2: 'Connect Telegram', 3: 'Agent Created' };
   document.getElementById('create-agent-title').textContent = titles[n] || 'New Agent';
@@ -1289,8 +1372,8 @@ function cawGoStep2() {
 
   // Set suggested bot names
   var label = id.replace(/[-_]/g, ' ').replace(/\\b\\w/g, function(c) { return c.toUpperCase(); });
-  document.getElementById('caw-suggested-name').textContent = 'ClaudeClaw ' + label;
-  document.getElementById('caw-suggested-username').textContent = 'claudeclaw_' + id.replace(/-/g, '_') + '_bot';
+  document.getElementById('caw-suggested-name').textContent = 'RawClaw ' + label;
+  document.getElementById('caw-suggested-username').textContent = 'rawclaw_' + id.replace(/-/g, '_') + '_bot';
 
   // Reset token state
   cawTokenValid = false;
@@ -1709,8 +1792,8 @@ function missionDragOver(e) {
   e.dataTransfer.dropEffect = 'move';
   var col = e.currentTarget.closest('[data-drop-agent]');
   if (col) {
-    col.style.borderColor = '#4f46e5';
-    col.style.background = 'rgba(79,70,229,0.08)';
+    col.style.borderColor = '#014421';
+    col.style.background = 'rgba(1,68,33,0.08)';
   }
 }
 
@@ -1910,6 +1993,151 @@ setInterval(refreshAll, 60000);
 
 // Initial load
 refreshAll();
+
+// ── Main Tab Switching ──────────────────────────────────────────────
+function switchMainTab(tab, btn) {
+  document.getElementById('main-tab-dashboard').style.display = tab === 'dashboard' ? '' : 'none';
+  document.getElementById('main-tab-database').style.display = tab === 'database' ? '' : 'none';
+  document.querySelectorAll('.db-nav-tab').forEach(function(t) { t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  if (tab === 'database' && !dbTablesLoaded) loadDbTables();
+}
+
+// ── Database Explorer ───────────────────────────────────────────────
+let dbTablesLoaded = false;
+let dbTables = [];
+let dbActiveTable = '';
+let dbCurrentPage = 1;
+let dbTotalPages = 1;
+let dbSortCol = '';
+let dbSortOrder = 'asc';
+
+async function loadDbTables() {
+  try {
+    const data = await api('/api/db/tables');
+    dbTables = data.tables || [];
+    dbTablesLoaded = true;
+    const list = document.getElementById('db-table-list');
+    if (dbTables.length === 0) {
+      list.innerHTML = '<div style="padding:8px 14px;color:#555;font-size:12px">No tables found</div>';
+      return;
+    }
+    list.innerHTML = dbTables.map(function(t) {
+      return '<div class="db-sidebar-item" data-table="' + escapeHtml(t.name) + '" onclick="dbSelectTable(this.dataset.table)"><span>' + escapeHtml(t.name) + '</span><span class="db-sidebar-count">' + t.rowCount.toLocaleString() + '</span></div>';
+    }).join('');
+    // Auto-select first table
+    dbSelectTable(dbTables[0].name);
+  } catch (err) {
+    document.getElementById('db-table-list').innerHTML = '<div style="padding:8px 14px;color:#f87171;font-size:12px">Error loading tables</div>';
+  }
+}
+
+function dbSelectTable(name) {
+  dbActiveTable = name;
+  dbCurrentPage = 1;
+  dbSortCol = '';
+  dbSortOrder = 'asc';
+  // Update sidebar active state
+  document.querySelectorAll('.db-sidebar-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.table === name);
+  });
+  loadDbTableData();
+}
+
+async function loadDbTableData() {
+  if (!dbActiveTable) return;
+  var params = '?page=' + dbCurrentPage + '&limit=50';
+  if (dbSortCol) params += '&sort=' + encodeURIComponent(dbSortCol) + '&order=' + dbSortOrder;
+  try {
+    const data = await api('/api/db/tables/' + encodeURIComponent(dbActiveTable) + params);
+    dbTotalPages = data.pages || 1;
+    dbCurrentPage = data.page || 1;
+    renderDbGrid(data.columns, data.rows, true);
+    // Update pagination
+    var pag = document.getElementById('db-pagination');
+    pag.style.display = '';
+    document.getElementById('db-row-info').textContent = data.total.toLocaleString() + ' rows';
+    document.getElementById('db-page-info').textContent = 'Page ' + dbCurrentPage + ' of ' + dbTotalPages;
+    document.getElementById('db-prev-btn').disabled = dbCurrentPage <= 1;
+    document.getElementById('db-next-btn').disabled = dbCurrentPage >= dbTotalPages;
+  } catch (err) {
+    document.getElementById('db-grid-body').innerHTML = '<tr><td style="padding:20px;color:#f87171">Error loading data</td></tr>';
+  }
+}
+
+function renderDbGrid(columns, rows, sortable) {
+  var head = document.getElementById('db-grid-head');
+  var body = document.getElementById('db-grid-body');
+  if (!columns || columns.length === 0) {
+    head.innerHTML = '';
+    body.innerHTML = '<tr><td style="padding:20px;color:#555">No data</td></tr>';
+    return;
+  }
+  head.innerHTML = '<tr>' + columns.map(function(col) {
+    var isSorted = sortable && dbSortCol === col;
+    var arrow = isSorted ? (dbSortOrder === 'asc' ? '&#9650;' : '&#9660;') : '&#9650;';
+    var cls = isSorted ? 'sorted' : '';
+    var onclick = sortable ? ' data-col="' + escapeHtml(col) + '" onclick="dbToggleSort(this.dataset.col)"' : '';
+    return '<th class="' + cls + '"' + onclick + '>' + escapeHtml(col) + '<span class="sort-arrow">' + arrow + '</span></th>';
+  }).join('') + '</tr>';
+  if (rows.length === 0) {
+    body.innerHTML = '<tr><td colspan="' + columns.length + '" style="padding:20px;color:#555;text-align:center">Empty table</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(function(row) {
+    return '<tr>' + columns.map(function(col) {
+      var val = row[col];
+      if (val === null || val === undefined) return '<td class="null-val">NULL</td>';
+      var s = String(val);
+      if (s.length > 200) s = s.substring(0, 200) + '...';
+      return '<td title="' + escapeHtml(String(val)).replace(/"/g, '&quot;') + '">' + escapeHtml(s) + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+}
+
+function dbToggleSort(col) {
+  if (dbSortCol === col) {
+    dbSortOrder = dbSortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    dbSortCol = col;
+    dbSortOrder = 'asc';
+  }
+  dbCurrentPage = 1;
+  loadDbTableData();
+}
+
+function dbPrevPage() {
+  if (dbCurrentPage > 1) { dbCurrentPage--; loadDbTableData(); }
+}
+
+function dbNextPage() {
+  if (dbCurrentPage < dbTotalPages) { dbCurrentPage++; loadDbTableData(); }
+}
+
+async function dbRunQuery() {
+  var sql = document.getElementById('db-query-input').value.trim();
+  if (!sql) return;
+  var errEl = document.getElementById('db-query-error');
+  var statusEl = document.getElementById('db-query-status');
+  errEl.style.display = 'none';
+  statusEl.textContent = 'Running...';
+  try {
+    var data = await api('/api/db/query?sql=' + encodeURIComponent(sql));
+    if (data.error) {
+      errEl.textContent = data.error;
+      errEl.style.display = '';
+      statusEl.textContent = '';
+      return;
+    }
+    statusEl.textContent = data.rowCount + ' row' + (data.rowCount !== 1 ? 's' : '') + ' returned';
+    document.getElementById('db-pagination').style.display = 'none';
+    renderDbGrid(data.columns, data.rows, false);
+  } catch (err) {
+    errEl.textContent = 'Request failed';
+    errEl.style.display = '';
+    statusEl.textContent = '';
+  }
+}
 
 // \u2500\u2500 Chat \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 let chatOpen = false;

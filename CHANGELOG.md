@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to ClaudeClaw will be documented here.
+All notable changes to RawClaw will be documented here.
 
 ## [v1.1.1] - 2026-03-06
 

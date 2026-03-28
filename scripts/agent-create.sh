@@ -1,18 +1,18 @@
 #!/bin/bash
-# ClaudeClaw Agent Creator
+# RawClaw Agent Creator
 # Usage: npm run agent:create
 # Or:    bash scripts/agent-create.sh
 
 set -e
 cd "$(dirname "$0")/.."
 
-# Resolve config directory — CLAUDECLAW_CONFIG from .env or environment, default ~/.claudeclaw
-if [ -z "$CLAUDECLAW_CONFIG" ]; then
-  CLAUDECLAW_CONFIG=$(grep '^CLAUDECLAW_CONFIG=' .env 2>/dev/null | cut -d'=' -f2- | sed "s|^~|$HOME|")
+# Resolve config directory — RAWCLAW_CONFIG from .env or environment, default ~/.rawclaw
+if [ -z "$RAWCLAW_CONFIG" ]; then
+  RAWCLAW_CONFIG=$(grep '^RAWCLAW_CONFIG=' .env 2>/dev/null | cut -d'=' -f2- | sed "s|^~|$HOME|")
 fi
-CLAUDECLAW_CONFIG="${CLAUDECLAW_CONFIG:-$HOME/.claudeclaw}"
+RAWCLAW_CONFIG="${RAWCLAW_CONFIG:-$HOME/.rawclaw}"
 
-echo "=== ClaudeClaw Agent Creator ==="
+echo "=== RawClaw Agent Creator ==="
 echo ""
 
 # Step 1: Pick a template or start blank
@@ -37,9 +37,9 @@ esac
 # Step 2: Name the agent
 read -p "Agent ID (lowercase, no spaces, e.g. 'comms'): " AGENT_ID
 
-# Config goes to CLAUDECLAW_CONFIG if the dir exists, otherwise repo's agents/
-if [ -d "$CLAUDECLAW_CONFIG" ]; then
-  AGENT_DIR="$CLAUDECLAW_CONFIG/agents/$AGENT_ID"
+# Config goes to RAWCLAW_CONFIG if the dir exists, otherwise repo's agents/
+if [ -d "$RAWCLAW_CONFIG" ]; then
+  AGENT_DIR="$RAWCLAW_CONFIG/agents/$AGENT_ID"
   echo "Config directory: $AGENT_DIR (external)"
 else
   AGENT_DIR="agents/$AGENT_ID"
@@ -70,7 +70,7 @@ echo ""
 echo "  1. Open Telegram and message @BotFather"
 echo "  2. Send /newbot"
 AGENT_LABEL=$(echo "$AGENT_ID" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
-echo "  3. Name it something like 'Mark $AGENT_LABEL' or 'ClaudeClaw $AGENT_LABEL'"
+echo "  3. Name it something like 'Mark $AGENT_LABEL' or 'RawClaw $AGENT_LABEL'"
 echo "  4. Give it a username like 'mark_${AGENT_ID}_bot'"
 echo "  5. Copy the token BotFather gives you"
 echo ""
