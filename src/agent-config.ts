@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 
-import { RAWCLAW_CONFIG, PROJECT_ROOT } from './config.js';
+import { BUSINESSOS_CONFIG, PROJECT_ROOT } from './config.js';
 import { readEnvFile } from './env.js';
 
 export interface AgentConfig {
@@ -19,11 +19,11 @@ export interface AgentConfig {
 }
 
 /**
- * Resolve the directory for a given agent, checking RAWCLAW_CONFIG first,
+ * Resolve the directory for a given agent, checking BUSINESSOS_CONFIG first,
  * then falling back to PROJECT_ROOT/agents/<id>.
  */
 export function resolveAgentDir(agentId: string): string {
-  const externalDir = path.join(RAWCLAW_CONFIG, 'agents', agentId);
+  const externalDir = path.join(BUSINESSOS_CONFIG, 'agents', agentId);
   if (fs.existsSync(path.join(externalDir, 'agent.yaml'))) {
     return externalDir;
   }
@@ -31,11 +31,11 @@ export function resolveAgentDir(agentId: string): string {
 }
 
 /**
- * Resolve the CLAUDE.md path for a given agent, checking RAWCLAW_CONFIG first,
+ * Resolve the CLAUDE.md path for a given agent, checking BUSINESSOS_CONFIG first,
  * then falling back to PROJECT_ROOT/agents/<id>/CLAUDE.md.
  */
 export function resolveAgentClaudeMd(agentId: string): string | null {
-  const externalPath = path.join(RAWCLAW_CONFIG, 'agents', agentId, 'CLAUDE.md');
+  const externalPath = path.join(BUSINESSOS_CONFIG, 'agents', agentId, 'CLAUDE.md');
   if (fs.existsSync(externalPath)) {
     return externalPath;
   }
@@ -102,13 +102,13 @@ export function setAgentModel(agentId: string, model: string): void {
 }
 
 /** List all configured agent IDs (directories under agents/ with agent.yaml).
- *  Scans both RAWCLAW_CONFIG/agents/ and PROJECT_ROOT/agents/, deduplicating.
+ *  Scans both BUSINESSOS_CONFIG/agents/ and PROJECT_ROOT/agents/, deduplicating.
  */
 export function listAgentIds(): string[] {
   const ids = new Set<string>();
 
   for (const baseDir of [
-    path.join(RAWCLAW_CONFIG, 'agents'),
+    path.join(BUSINESSOS_CONFIG, 'agents'),
     path.join(PROJECT_ROOT, 'agents'),
   ]) {
     if (!fs.existsSync(baseDir)) continue;

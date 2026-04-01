@@ -276,7 +276,7 @@ function createSchema(database: Database.Database): void {
 
 export function initDatabase(): void {
   fs.mkdirSync(STORE_DIR, { recursive: true });
-  const dbPath = path.join(STORE_DIR, 'rawclaw.db');
+  const dbPath = path.join(STORE_DIR, 'businessos.db');
 
   // Validate encryption key is available before proceeding
   getEncryptionKey();
@@ -1609,6 +1609,28 @@ export function getOtherAgentActivity(
 }
 
 /**
+ * Get the Unix timestamp of the most recent hive_mind entry for an agent.
+ * Returns null if the agent has never logged anything.
+ */
+export function getAgentLastActive(agentId: string): number | null {
+  const row = db
+    .prepare('SELECT MAX(created_at) as ts FROM hive_mind WHERE agent_id = ?')
+    .get(agentId) as { ts: number | null };
+  return row?.ts ?? null;
+}
+
+/**
+ * Get the title of the currently running mission task for an agent.
+ * Returns null if no mission is in-flight.
+ */
+export function getAgentActiveMission(agentId: string): string | null {
+  const row = db
+    .prepare(`SELECT title FROM mission_tasks WHERE assigned_agent = ? AND status = 'running' ORDER BY started_at DESC LIMIT 1`)
+    .get(agentId) as { title: string } | undefined;
+  return row?.title ?? null;
+}
+
+/**
  * Get conversation turns for a specific session, ordered chronologically.
  * Used for hive-mind auto-commit on session end.
  */
@@ -1951,58 +1973,299 @@ export function getRecentBlockedActions(limit = 10): AuditLogEntry[] {
   ).all(limit) as AuditLogEntry[];
 }
 
-// ── Database Explorer ──────────────────────────────────────────────────
+// ── Software Costs ────────────────────────────────────────────────────────────
 
-export interface DbTableInfo {
-  name: string;
-  rowCount: number;
-  columns: Array<{ name: string; type: string; notnull: number; pk: number }>;
+export interface SoftwareCost {
+  id: number;
+  vendor: string;
+  amount: number;
+  frequency: string;
+  monthly_eq: number;
+  category: string;
+  status: string;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
 }
 
-export function getDbTables(): DbTableInfo[] {
-  const tables = db.prepare(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name`,
-  ).all() as Array<{ name: string }>;
-
-  return tables.map((t) => {
-    const rowCount = (db.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number }).c;
-    const columns = db.prepare(`PRAGMA table_info("${t.name}")`).all() as Array<{ name: string; type: string; notnull: number; pk: number }>;
-    return { name: t.name, rowCount, columns };
-  });
+export function getSoftwareCosts(): SoftwareCost[] {
+  // Ensure the table exists (idempotent)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS software_costs (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      vendor     TEXT NOT NULL,
+      amount     REAL NOT NULL,
+      frequency  TEXT NOT NULL DEFAULT 'monthly',
+      monthly_eq REAL NOT NULL,
+      category   TEXT NOT NULL DEFAULT 'other',
+      status     TEXT NOT NULL DEFAULT 'active',
+      notes      TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    )
+  `);
+  return db.prepare(
+    `SELECT * FROM software_costs ORDER BY monthly_eq DESC`,
+  ).all() as SoftwareCost[];
 }
 
-export function getDbTableNames(): string[] {
-  return (db.prepare(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name`,
-  ).all() as Array<{ name: string }>).map((t) => t.name);
+export function upsertSoftwareCost(vendor: string, amount: number, frequency: string, monthly_eq: number, category: string, status: string, notes?: string): void {
+  db.prepare(`
+    INSERT INTO software_costs (vendor, amount, frequency, monthly_eq, category, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(vendor) DO UPDATE SET
+      amount = excluded.amount,
+      frequency = excluded.frequency,
+      monthly_eq = excluded.monthly_eq,
+      category = excluded.category,
+      status = excluded.status,
+      notes = excluded.notes,
+      updated_at = strftime('%s','now')
+  `).run(vendor, amount, frequency, monthly_eq, category, status, notes ?? null);
 }
 
-export function getDbTableRows(
-  tableName: string,
-  page = 1,
-  limit = 50,
-  sort?: string,
-  order: 'asc' | 'desc' = 'asc',
-): { columns: string[]; rows: Record<string, unknown>[]; total: number; page: number; pages: number } {
-  const columns = (db.prepare(`PRAGMA table_info("${tableName}")`).all() as Array<{ name: string }>).map((c) => c.name);
-  const total = (db.prepare(`SELECT COUNT(*) as c FROM "${tableName}"`).get() as { c: number }).c;
-  const pages = Math.max(1, Math.ceil(total / limit));
-  const offset = (Math.max(1, Math.min(page, pages)) - 1) * limit;
+// ── Agent Performance Eval Layer ──────────────────────────────────────
 
-  let orderClause = '';
-  if (sort && columns.includes(sort)) {
-    const dir = order === 'desc' ? 'DESC' : 'ASC';
-    orderClause = ` ORDER BY "${sort}" ${dir}`;
+export interface AgentPerformanceMetrics {
+  agent_id: string;
+  period: string; // 'current' | 'YYYY-MM'
+  task_completion_rate: number;
+  error_recovery_rate: number;
+  tool_call_success_pct: number;
+  avg_response_time_sec: number;
+  total_tasks: number;
+  completed_tasks: number;
+  failed_tasks: number;
+  recovered_tasks: number;
+  total_cost_usd: number;
+  total_turns: number;
+  activity_count: number;
+}
+
+// Agent IDs use two naming conventions across tables:
+// - token_usage uses folder names: scan, ali, larry, sam, ovi, quilly, cleo
+// - mission_tasks uses role IDs: main, dev, ops, finance, research, content, comms
+// - hive_mind uses BOTH (inconsistent)
+// This mapping lets us query across all tables for one agent.
+const AGENT_ALIASES: Record<string, string[]> = {
+  main:     ['main', 'scan'],
+  dev:      ['dev', 'ali'],
+  comms:    ['comms', 'cleo'],
+  ops:      ['ops', 'larry'],
+  research: ['research', 'ovi'],
+  content:  ['content', 'quilly'],
+  finance:  ['finance', 'sam'],
+};
+
+function agentAliases(agentId: string): string[] {
+  return AGENT_ALIASES[agentId] ?? [agentId];
+}
+
+/**
+ * Compute live performance metrics for an agent over a given period.
+ * period: 'current' = last 30 days, or 'YYYY-MM' for a specific month.
+ */
+export function getAgentPerformanceMetrics(agentId: string, period = 'current'): AgentPerformanceMetrics {
+  let startTs: number;
+  let endTs: number;
+
+  if (period === 'current') {
+    endTs = Math.floor(Date.now() / 1000);
+    startTs = endTs - 30 * 86400;
+  } else {
+    const [year, month] = period.split('-').map(Number);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    startTs = Math.floor(start.getTime() / 1000);
+    endTs = Math.floor(end.getTime() / 1000);
   }
 
-  const rows = db.prepare(`SELECT * FROM "${tableName}"${orderClause} LIMIT ? OFFSET ?`).all(limit, offset) as Record<string, unknown>[];
+  const aliases = agentAliases(agentId);
+  const placeholders = aliases.map(() => '?').join(',');
 
-  return { columns, rows, total, page: Math.max(1, Math.min(page, pages)), pages };
+  // Mission task stats (uses role IDs like 'dev', 'comms')
+  const taskStats = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+      AVG(CASE WHEN status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL
+        THEN completed_at - started_at ELSE NULL END) as avg_duration
+    FROM mission_tasks
+    WHERE assigned_agent IN (${placeholders}) AND created_at >= ? AND created_at < ?
+  `).get(...aliases, startTs, endTs) as {
+    total: number; completed: number; failed: number; avg_duration: number | null;
+  };
+
+  // Error recovery from hive_mind (uses both naming conventions)
+  const errorEntries = db.prepare(`
+    SELECT COUNT(*) as cnt FROM hive_mind
+    WHERE agent_id IN (${placeholders}) AND created_at >= ? AND created_at < ?
+      AND (action LIKE '%error%' OR action LIKE '%fail%' OR action LIKE '%retry%')
+  `).get(...aliases, startTs, endTs) as { cnt: number };
+
+  const recoveryEntries = db.prepare(`
+    SELECT COUNT(*) as cnt FROM hive_mind
+    WHERE agent_id IN (${placeholders}) AND created_at >= ? AND created_at < ?
+      AND (action LIKE '%recover%' OR action LIKE '%retry_success%' OR action LIKE '%task_complete%')
+  `).get(...aliases, startTs, endTs) as { cnt: number };
+
+  // Token/cost stats (uses folder names like 'scan', 'ali')
+  const tokenStats = db.prepare(`
+    SELECT
+      COALESCE(SUM(cost_usd), 0) as total_cost,
+      COUNT(*) as total_turns
+    FROM token_usage
+    WHERE agent_id IN (${placeholders}) AND created_at >= ? AND created_at < ?
+  `).get(...aliases, startTs, endTs) as { total_cost: number; total_turns: number };
+
+  // Activity volume from hive_mind (both conventions)
+  const activityStats = db.prepare(`
+    SELECT COUNT(*) as cnt FROM hive_mind
+    WHERE agent_id IN (${placeholders}) AND created_at >= ? AND created_at < ?
+  `).get(...aliases, startTs, endTs) as { cnt: number };
+
+  const total = taskStats.total || 0;
+  const completed = taskStats.completed || 0;
+  const failed = taskStats.failed || 0;
+  const completionRate = total > 0 ? completed / total : 0;
+  const errorCount = errorEntries.cnt || 0;
+  const recoveryCount = recoveryEntries.cnt || 0;
+  const errorRecoveryRate = errorCount > 0 ? Math.min(recoveryCount / errorCount, 1) : 1;
+  const toolCallSuccessPct = (completed + failed) > 0 ? completed / (completed + failed) : 1;
+
+  return {
+    agent_id: agentId,
+    period,
+    task_completion_rate: Math.round(completionRate * 1000) / 1000,
+    error_recovery_rate: Math.round(errorRecoveryRate * 1000) / 1000,
+    tool_call_success_pct: Math.round(toolCallSuccessPct * 1000) / 1000,
+    avg_response_time_sec: Math.round(taskStats.avg_duration ?? 0),
+    total_tasks: total,
+    completed_tasks: completed,
+    failed_tasks: failed,
+    recovered_tasks: recoveryCount,
+    total_cost_usd: Math.round(tokenStats.total_cost * 100) / 100,
+    total_turns: tokenStats.total_turns,
+    activity_count: activityStats.cnt,
+  };
 }
 
-export function runReadOnlyQuery(sql: string): { columns: string[]; rows: Record<string, unknown>[]; rowCount: number } {
-  const stmt = db.prepare(sql);
-  const rows = stmt.all() as Record<string, unknown>[];
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-  return { columns, rows, rowCount: rows.length };
+/**
+ * Get performance metrics for ALL agents.
+ */
+export function getAllAgentPerformanceMetrics(period = 'current'): AgentPerformanceMetrics[] {
+  const agentIds = Object.keys(AGENT_ALIASES);
+  return agentIds.map((id) => getAgentPerformanceMetrics(id, period));
+}
+
+/**
+ * Store a monthly performance snapshot for a client.
+ * Table is created on first call (idempotent).
+ */
+export function storePerformanceSnapshot(clientId: string, month: string, metrics: AgentPerformanceMetrics[]): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_agent_performance (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id             TEXT NOT NULL,
+      month                 TEXT NOT NULL,
+      agent_id              TEXT NOT NULL,
+      task_completion_rate   REAL NOT NULL DEFAULT 0,
+      error_recovery_rate    REAL NOT NULL DEFAULT 0,
+      tool_call_success_pct  REAL NOT NULL DEFAULT 0,
+      avg_response_time_sec  REAL NOT NULL DEFAULT 0,
+      total_tasks            INTEGER NOT NULL DEFAULT 0,
+      completed_tasks        INTEGER NOT NULL DEFAULT 0,
+      failed_tasks           INTEGER NOT NULL DEFAULT 0,
+      recovered_tasks        INTEGER NOT NULL DEFAULT 0,
+      total_cost_usd         REAL NOT NULL DEFAULT 0,
+      total_turns            INTEGER NOT NULL DEFAULT 0,
+      activity_count         INTEGER NOT NULL DEFAULT 0,
+      created_at             INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      UNIQUE(client_id, month, agent_id)
+    )
+  `);
+
+  const stmt = db.prepare(`
+    INSERT INTO client_agent_performance
+      (client_id, month, agent_id, task_completion_rate, error_recovery_rate,
+       tool_call_success_pct, avg_response_time_sec, total_tasks, completed_tasks,
+       failed_tasks, recovered_tasks, total_cost_usd, total_turns, activity_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(client_id, month, agent_id) DO UPDATE SET
+      task_completion_rate = excluded.task_completion_rate,
+      error_recovery_rate = excluded.error_recovery_rate,
+      tool_call_success_pct = excluded.tool_call_success_pct,
+      avg_response_time_sec = excluded.avg_response_time_sec,
+      total_tasks = excluded.total_tasks,
+      completed_tasks = excluded.completed_tasks,
+      failed_tasks = excluded.failed_tasks,
+      recovered_tasks = excluded.recovered_tasks,
+      total_cost_usd = excluded.total_cost_usd,
+      total_turns = excluded.total_turns,
+      activity_count = excluded.activity_count
+  `);
+
+  const insertMany = db.transaction((rows: AgentPerformanceMetrics[]) => {
+    for (const m of rows) {
+      stmt.run(clientId, month, m.agent_id, m.task_completion_rate, m.error_recovery_rate,
+        m.tool_call_success_pct, m.avg_response_time_sec, m.total_tasks, m.completed_tasks,
+        m.failed_tasks, m.recovered_tasks, m.total_cost_usd, m.total_turns, m.activity_count);
+    }
+  });
+
+  insertMany(metrics);
+}
+
+/**
+ * Get stored monthly performance snapshots for a client.
+ */
+export function getPerformanceSnapshots(clientId: string, months = 6): ClientPerformanceSnapshot[] {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_agent_performance (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id             TEXT NOT NULL,
+      month                 TEXT NOT NULL,
+      agent_id              TEXT NOT NULL,
+      task_completion_rate   REAL NOT NULL DEFAULT 0,
+      error_recovery_rate    REAL NOT NULL DEFAULT 0,
+      tool_call_success_pct  REAL NOT NULL DEFAULT 0,
+      avg_response_time_sec  REAL NOT NULL DEFAULT 0,
+      total_tasks            INTEGER NOT NULL DEFAULT 0,
+      completed_tasks        INTEGER NOT NULL DEFAULT 0,
+      failed_tasks           INTEGER NOT NULL DEFAULT 0,
+      recovered_tasks        INTEGER NOT NULL DEFAULT 0,
+      total_cost_usd         REAL NOT NULL DEFAULT 0,
+      total_turns            INTEGER NOT NULL DEFAULT 0,
+      activity_count         INTEGER NOT NULL DEFAULT 0,
+      created_at             INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+      UNIQUE(client_id, month, agent_id)
+    )
+  `);
+
+  return db.prepare(`
+    SELECT * FROM client_agent_performance
+    WHERE client_id = ?
+    ORDER BY month DESC, agent_id ASC
+    LIMIT ?
+  `).all(clientId, months * 7) as ClientPerformanceSnapshot[];
+}
+
+export interface ClientPerformanceSnapshot {
+  id: number;
+  client_id: string;
+  month: string;
+  agent_id: string;
+  task_completion_rate: number;
+  error_recovery_rate: number;
+  tool_call_success_pct: number;
+  avg_response_time_sec: number;
+  total_tasks: number;
+  completed_tasks: number;
+  failed_tasks: number;
+  recovered_tasks: number;
+  total_cost_usd: number;
+  total_turns: number;
+  activity_count: number;
+  created_at: number;
 }

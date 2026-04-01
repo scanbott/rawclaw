@@ -21,7 +21,6 @@ import { emitChatEvent } from './state.js';
 type Sender = (text: string) => Promise<void>;
 
 /** Max time (ms) a scheduled task can run before being killed. */
-const TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 let sender: Sender;
 
@@ -86,19 +85,16 @@ async function runDueTasks(): Promise<void> {
     const chatId = ALLOWED_CHAT_ID || 'scheduler';
     messageQueue.enqueue(chatId, async () => {
       const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), TASK_TIMEOUT_MS);
 
       try {
-        await sender(`Scheduled task running: "${task.prompt.slice(0, 80)}${task.prompt.length > 80 ? '...' : ''}"`);
+        await sender(`Checking for new tasks 📁`);
 
         // Run as a fresh agent call (no session — scheduled tasks are autonomous)
         const result = await runAgent(task.prompt, undefined, () => {}, undefined, undefined, abortController);
-        clearTimeout(timeout);
 
         if (result.aborted) {
-          updateTaskAfterRun(task.id, nextRun, 'Timed out after 10 minutes', 'timeout');
-          await sender(`⏱ Task timed out after 10m: "${task.prompt.slice(0, 60)}..." — killed.`);
-          logger.warn({ taskId: task.id }, 'Task timed out');
+          updateTaskAfterRun(task.id, nextRun, 'Task was stopped', 'failed');
+          await sender(`Task stopped: "${task.prompt.slice(0, 60)}..."`);
           return;
         }
 
@@ -118,7 +114,6 @@ async function runDueTasks(): Promise<void> {
 
         logger.info({ taskId: task.id, nextRun }, 'Task complete, next run scheduled');
       } catch (err) {
-        clearTimeout(timeout);
         const errMsg = err instanceof Error ? err.message : String(err);
         updateTaskAfterRun(task.id, nextRun, errMsg.slice(0, 500), 'failed');
 
@@ -151,16 +146,14 @@ async function runDueMissionTasks(): Promise<void> {
   const chatId = ALLOWED_CHAT_ID || 'mission';
   messageQueue.enqueue(chatId, async () => {
     const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), TASK_TIMEOUT_MS);
 
     try {
       const result = await runAgent(mission.prompt, undefined, () => {}, undefined, undefined, abortController);
-      clearTimeout(timeout);
 
       if (result.aborted) {
-        completeMissionTask(mission.id, null, 'failed', 'Timed out after 10 minutes');
-        logger.warn({ missionId: mission.id }, 'Mission task timed out');
-        try { await sender('Mission task timed out: "' + mission.title + '"'); } catch {}
+        completeMissionTask(mission.id, null, 'failed', 'Task was stopped');
+        logger.warn({ missionId: mission.id }, 'Mission task stopped');
+        try { await sender('Mission task stopped: "' + mission.title + '"'); } catch {}
       } else {
         const text = result.text?.trim() || 'Task completed with no output.';
         completeMissionTask(mission.id, text, 'completed');
@@ -189,7 +182,6 @@ async function runDueMissionTasks(): Promise<void> {
         }),
       });
     } catch (err) {
-      clearTimeout(timeout);
       const errMsg = err instanceof Error ? err.message : String(err);
       completeMissionTask(mission.id, null, 'failed', errMsg.slice(0, 500));
       logger.error({ err, missionId: mission.id }, 'Mission task failed');

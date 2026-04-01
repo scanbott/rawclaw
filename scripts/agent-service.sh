@@ -1,5 +1,5 @@
 #!/bin/bash
-# RawClaw Agent Service Manager
+# BusinessOS Agent Service Manager
 # Installs/uninstalls a launchd plist (macOS) or systemd unit (Linux) for an agent.
 #
 # Usage:
@@ -20,7 +20,7 @@ if [ -z "$ACTION" ] || [ -z "$AGENT_ID" ]; then
   exit 1
 fi
 
-SERVICE_NAME="com.rawclaw.agent-${AGENT_ID}"
+SERVICE_NAME="com.[COMPANY_DOMAIN_REVERSED].agent-${AGENT_ID}"
 
 if [ "$(uname)" = "Darwin" ]; then
   # macOS: launchd plist
@@ -80,7 +80,7 @@ else
     mkdir -p "$UNIT_DIR"
     cat > "$UNIT_PATH" << UNIT
 [Unit]
-Description=RawClaw Agent: ${AGENT_ID}
+Description=BusinessOS Agent: ${AGENT_ID}
 After=network.target
 
 [Service]

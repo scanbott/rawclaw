@@ -12,11 +12,14 @@ const envConfig = readEnvFile([
   'ELEVENLABS_VOICE_ID',
   'WHATSAPP_ENABLED',
   'SLACK_USER_TOKEN',
+  'SLACK_BOT_TOKEN',
+  'SLACK_SIGNING_SECRET',
+  'SLACK_APP_ID',
   'CONTEXT_LIMIT',
   'DASHBOARD_PORT',
   'DASHBOARD_TOKEN',
   'DASHBOARD_URL',
-  'RAWCLAW_CONFIG',
+  'BUSINESSOS_CONFIG',
   'DB_ENCRYPTION_KEY',
   'GOOGLE_API_KEY',
   'AGENT_TIMEOUT_MS',
@@ -64,6 +67,18 @@ export const WHATSAPP_ENABLED =
 export const SLACK_USER_TOKEN =
   process.env.SLACK_USER_TOKEN || envConfig.SLACK_USER_TOKEN || '';
 
+export const SLACK_BOT_TOKEN =
+  process.env.SLACK_BOT_TOKEN || envConfig.SLACK_BOT_TOKEN || '';
+
+export const SLACK_SIGNING_SECRET =
+  process.env.SLACK_SIGNING_SECRET || envConfig.SLACK_SIGNING_SECRET || '';
+
+export const SLACK_APP_ID =
+  process.env.SLACK_APP_ID || envConfig.SLACK_APP_ID || '';
+
+// Prefer bot token, fall back to user token for backward compat
+export const SLACK_TOKEN = SLACK_BOT_TOKEN || SLACK_USER_TOKEN;
+
 // Voice — read via readEnvFile, not process.env
 export const GROQ_API_KEY = envConfig.GROQ_API_KEY ?? '';
 export const ELEVENLABS_API_KEY = envConfig.ELEVENLABS_API_KEY ?? '';
@@ -72,7 +87,7 @@ export const ELEVENLABS_VOICE_ID = envConfig.ELEVENLABS_VOICE_ID ?? '';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// PROJECT_ROOT is the rawclaw/ directory — where CLAUDE.md lives.
+// PROJECT_ROOT is the businessos/ directory — where CLAUDE.md lives.
 // The SDK uses this as cwd, which causes Claude Code to load our CLAUDE.md
 // and all global skills from ~/.claude/skills/ via settingSources.
 export const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -80,7 +95,7 @@ export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
 
 // ── External config directory ────────────────────────────────────────
 // Personal config files (CLAUDE.md, agent.yaml, agent CLAUDE.md) can live
-// outside the repo in RAWCLAW_CONFIG (default ~/.rawclaw) so they
+// outside the repo in BUSINESSOS_CONFIG (default ~/.businessos) so they
 // never get committed. The repo ships only .example template files.
 
 /** Expand ~/... to an absolute path. */
@@ -92,13 +107,13 @@ export function expandHome(p: string): string {
 }
 
 const rawConfigDir =
-  process.env.RAWCLAW_CONFIG || envConfig.RAWCLAW_CONFIG || '~/.rawclaw';
+  process.env.BUSINESSOS_CONFIG || envConfig.BUSINESSOS_CONFIG || '~/.businessos';
 
 /**
  * Absolute path to the external config directory.
- * Defaults to ~/.rawclaw. Set RAWCLAW_CONFIG in .env or environment to override.
+ * Defaults to ~/.businessos. Set BUSINESSOS_CONFIG in .env or environment to override.
  */
-export const RAWCLAW_CONFIG = expandHome(rawConfigDir);
+export const BUSINESSOS_CONFIG = expandHome(rawConfigDir);
 
 // Telegram limits
 export const MAX_MESSAGE_LENGTH = 4096;
@@ -124,7 +139,7 @@ export const CONTEXT_LIMIT = parseInt(
   10,
 );
 
-// Dashboard — web UI for monitoring RawClaw state
+// Dashboard — web UI for monitoring BusinessOS state
 export const DASHBOARD_PORT = parseInt(
   process.env.DASHBOARD_PORT || envConfig.DASHBOARD_PORT || '3141',
   10,

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * RawClaw Mission CLI
+ * BusinessOS Mission CLI
  *
  * Used by Claude assistants to create and manage one-shot mission tasks
  * that are picked up and executed by the target agent's scheduler.
@@ -49,7 +49,7 @@ const priorityArg = priorityFlagIdx !== -1
   : 5;
 
 // Who created this task
-const createdBy = process.env.RAWCLAW_AGENT_ID ?? 'main';
+const createdBy = process.env.BUSINESSOS_AGENT_ID ?? 'main';
 
 // Clean argv: remove all flag pairs
 const flagIndices = new Set<number>();

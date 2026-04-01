@@ -4,14 +4,15 @@ import path from 'path';
 import { loadAgentConfig, resolveAgentDir, resolveAgentClaudeMd } from './agent-config.js';
 import { createBot } from './bot.js';
 import { checkPendingMigrations } from './migrations.js';
-import { ALLOWED_CHAT_ID, activeBotToken, STORE_DIR, PROJECT_ROOT, RAWCLAW_CONFIG, GOOGLE_API_KEY, setAgentOverrides, SECURITY_PIN_HASH, IDLE_LOCK_MINUTES, EMERGENCY_KILL_PHRASE } from './config.js';
+import { ALLOWED_CHAT_ID, activeBotToken, STORE_DIR, PROJECT_ROOT, BUSINESSOS_CONFIG, GOOGLE_API_KEY, setAgentOverrides, SECURITY_PIN_HASH, IDLE_LOCK_MINUTES, EMERGENCY_KILL_PHRASE } from './config.js';
 import { startDashboard } from './dashboard.js';
+import { setSlackMessageHandler } from './integrations/slack-events.js';
 import { initDatabase, cleanupOldMissionTasks, insertAuditLog } from './db.js';
 import { initSecurity, setAuditCallback } from './security.js';
 import { logger } from './logger.js';
 import { cleanupOldUploads } from './media.js';
-import { runConsolidation } from './memory-consolidate.js';
-import { runDecaySweep } from './memory.js';
+import { runConsolidation } from './memory/consolidate.js';
+import { runDecaySweep } from './memory/index.js';
 import { initOrchestrator } from './orchestrator.js';
 import { initScheduler } from './scheduler.js';
 import { setTelegramConnected, setBotInfo } from './state.js';
@@ -21,7 +22,7 @@ const agentFlagIndex = process.argv.indexOf('--agent');
 const AGENT_ID = agentFlagIndex !== -1 ? process.argv[agentFlagIndex + 1] : 'main';
 
 // Export AGENT_ID to env so child processes (schedule-cli, etc.) inherit it
-process.env.RAWCLAW_AGENT_ID = AGENT_ID;
+process.env.BUSINESSOS_AGENT_ID = AGENT_ID;
 
 if (AGENT_ID !== 'main') {
   const agentConfig = loadAgentConfig(AGENT_ID);
@@ -43,11 +44,11 @@ if (AGENT_ID !== 'main') {
   });
   logger.info({ agentId: AGENT_ID, name: agentConfig.name }, 'Running as agent');
 } else {
-  // For main bot: read CLAUDE.md from RAWCLAW_CONFIG and inject it as
+  // For main bot: read CLAUDE.md from BUSINESSOS_CONFIG and inject it as
   // systemPrompt — the same pattern used by sub-agents. Never copy the file
-  // into the repo; that defeats the purpose of RAWCLAW_CONFIG and risks
+  // into the repo; that defeats the purpose of BUSINESSOS_CONFIG and risks
   // accidentally committing personal config.
-  const externalClaudeMd = path.join(RAWCLAW_CONFIG, 'CLAUDE.md');
+  const externalClaudeMd = path.join(BUSINESSOS_CONFIG, 'CLAUDE.md');
   if (fs.existsSync(externalClaudeMd)) {
     let systemPrompt: string | undefined;
     try {
@@ -60,17 +61,17 @@ if (AGENT_ID !== 'main') {
         cwd: PROJECT_ROOT,
         systemPrompt,
       });
-      logger.info({ source: externalClaudeMd }, 'Loaded CLAUDE.md from RAWCLAW_CONFIG');
+      logger.info({ source: externalClaudeMd }, 'Loaded CLAUDE.md from BUSINESSOS_CONFIG');
     }
   } else if (!fs.existsSync(path.join(PROJECT_ROOT, 'CLAUDE.md'))) {
     logger.warn(
       'No CLAUDE.md found. Copy CLAUDE.md.example to %s/CLAUDE.md and customize it.',
-      RAWCLAW_CONFIG,
+      BUSINESSOS_CONFIG,
     );
   }
 }
 
-const PID_FILE = path.join(STORE_DIR, `${AGENT_ID === 'main' ? 'rawclaw' : `agent-${AGENT_ID}`}.pid`);
+const PID_FILE = path.join(STORE_DIR, `${AGENT_ID === 'main' ? 'businessos' : `agent-${AGENT_ID}`}.pid`);
 
 function showBanner(): void {
   const bannerPath = path.join(PROJECT_ROOT, 'banner.txt');
@@ -78,7 +79,7 @@ function showBanner(): void {
     const banner = fs.readFileSync(bannerPath, 'utf-8');
     console.log('\n' + banner);
   } catch {
-    console.log('\n  RawClaw\n');
+    console.log('\n  BusinessOS\n');
   }
 }
 
@@ -168,8 +169,12 @@ async function main(): Promise<void> {
   const bot = createBot();
 
   // Dashboard only runs in the main bot process
-  if (AGENT_ID === 'main') {
+  if (AGENT_ID === 'scan') {
     startDashboard(bot.api);
+
+    // Register Slack message handler so Slack events route through the agent
+    const { processMessageFromSlack } = await import('./bot.js');
+    setSlackMessageHandler(processMessageFromSlack);
   }
 
   if (ALLOWED_CHAT_ID) {
@@ -201,21 +206,21 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
 
-  logger.info({ agentId: AGENT_ID }, 'Starting RawClaw...');
+  logger.info({ agentId: AGENT_ID }, 'Starting BusinessOS...');
 
   await bot.start({
     onStart: (botInfo) => {
       setTelegramConnected(true);
-      setBotInfo(botInfo.username ?? '', botInfo.first_name ?? 'RawClaw');
-      logger.info({ username: botInfo.username }, 'RawClaw is running');
+      setBotInfo(botInfo.username ?? '', botInfo.first_name ?? 'BusinessOS');
+      logger.info({ username: botInfo.username }, 'BusinessOS is running');
       if (AGENT_ID === 'main') {
-        console.log(`\n  RawClaw online: @${botInfo.username}`);
+        console.log(`\n  BusinessOS online: @${botInfo.username}`);
         if (!ALLOWED_CHAT_ID) {
           console.log(`  Send /chatid to get your chat ID for ALLOWED_CHAT_ID`);
         }
         console.log();
       } else {
-        console.log(`\n  RawClaw agent [${AGENT_ID}] online: @${botInfo.username}\n`);
+        console.log(`\n  BusinessOS agent [${AGENT_ID}] online: @${botInfo.username}\n`);
       }
     },
   });

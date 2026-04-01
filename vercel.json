@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/close-webhook.js": {
+      "memory": 128,
+      "maxDuration": 15
+    },
+    "api/calendly-webhook.js": {
+      "memory": 256,
+      "maxDuration": 30
+    }
+  }
+}

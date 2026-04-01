@@ -1,42 +1,21 @@
-# Dependencies
 node_modules/
-
-# Build output
 dist/
-
-# Environment — never commit API keys
-.env
-
-# Runtime data — NEVER commit. Contains WhatsApp/Slack messages,
-# session tokens, conversation logs, and database files.
 store/
-workspace/
-*.db
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
-
-# Migration state — local only
-migrations/.applied.json
-
-# Logs
+.env
+*.pid
 *.log
-/tmp/rawclaw.*
+.applied.json
 
-# macOS
+# Sensitive files - never commit
+*.key
+*.pem
+credentials.json
+
+# OS files
 .DS_Store
+Thumbs.db
 
 # Editor
 .vscode/
 .idea/
 *.swp
-.wwebjs_cache/
-
-# Personal scripts — not for sharing
-scripts/waste-reminder.sh
-
-# Personal config — lives in RAWCLAW_CONFIG (default ~/.rawclaw)
-CLAUDE.md
-agents/*/agent.yaml
-agents/*/CLAUDE.md
