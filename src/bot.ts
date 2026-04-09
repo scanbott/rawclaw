@@ -4,6 +4,7 @@ import os from 'os';
 import { Api, Bot, Context, InputFile, RawApi } from 'grammy';
 
 import { runAgent, UsageInfo, AgentProgressEvent } from './agent.js';
+import { readEnvFile } from './env.js';
 import {
   AGENT_ID,
   ALLOWED_CHAT_ID,
@@ -16,13 +17,14 @@ import {
   agentDefaultModel,
   agentSystemPrompt,
   TYPING_REFRESH_MS,
+  AGENT_TIMEOUT_MS,
   STREAM_STRATEGY,
 } from './config.js';
 import { clearSession, getRecentConversation, getRecentMemories, getRecentTaskOutputs, getSession, getSessionConversation, logToHiveMind, pinMemory, unpinMemory, setSession, lookupWaChatId, saveWaMessageMap, saveTokenUsage } from './db.js';
 import { logger } from './logger.js';
 import { downloadMedia, buildPhotoMessage, buildDocumentMessage, buildVideoMessage } from './media.js';
-import { buildMemoryContext, evaluateMemoryRelevance, saveConversationTurn } from './memory/index.js';
-import { setHighImportanceCallback } from './memory/ingest.js';
+import { buildMemoryContext, evaluateMemoryRelevance, saveConversationTurn } from './memory.js';
+import { setHighImportanceCallback } from './memory-ingest.js';
 import { messageQueue } from './message-queue.js';
 import { parseDelegation, delegateToAgent, getAvailableAgents } from './orchestrator.js';
 import { emitChatEvent, setProcessing, setActiveAbort, abortActiveQuery } from './state.js';
@@ -96,7 +98,7 @@ import {
   voiceCapabilities,
   UPLOADS_DIR,
 } from './voice.js';
-import { getSlackConversations, getSlackMessages, sendSlackMessage, SlackConversation } from './integrations/slack.js';
+import { getSlackConversations, getSlackMessages, sendSlackMessage, SlackConversation } from './slack.js';
 import { getWaChats, getWaChatMessages, sendWhatsAppMessage, WaChat } from './whatsapp.js';
 
 // Per-chat voice mode toggle (in-memory, resets on restart)
@@ -347,7 +349,7 @@ async function handleMessage(ctx: Context, message: string, forceVoiceReply = fa
   // First-run setup guidance: ALLOWED_CHAT_ID not set yet
   if (!ALLOWED_CHAT_ID) {
     await ctx.reply(
-      `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart BusinessOS.`,
+      `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart RawClaw.`,
     );
     return;
   }
@@ -493,6 +495,12 @@ async function handleMessage(ctx: Context, message: string, forceVoiceReply = fa
     const abortCtrl = new AbortController();
     setActiveAbort(chatIdStr, abortCtrl);
 
+    // Auto-abort if the agent runs too long (prevents runaway commands from blocking the bot)
+    const timeoutId = setTimeout(() => {
+      logger.warn({ chatId: chatIdStr, timeoutMs: AGENT_TIMEOUT_MS }, 'Agent query timed out, aborting');
+      abortCtrl.abort();
+    }, AGENT_TIMEOUT_MS);
+
     // Streaming: send a placeholder message and edit it as text arrives
     let streamMsgId: number | undefined;
     let lastEditLength = 0;
@@ -533,6 +541,7 @@ async function handleMessage(ctx: Context, message: string, forceVoiceReply = fa
       onStreamText,
     );
 
+    clearTimeout(timeoutId);
     setActiveAbort(chatIdStr, null);
     clearInterval(typingInterval);
 
@@ -544,7 +553,9 @@ async function handleMessage(ctx: Context, message: string, forceVoiceReply = fa
     // Handle abort (manual /stop or timeout)
     if (result.aborted) {
       setProcessing(chatIdStr, false);
-      const msg = 'Stopped.';
+      const msg = result.text === null
+        ? `Timed out after ${Math.round(AGENT_TIMEOUT_MS / 1000)}s. The task may have been too complex or a command got stuck. Try breaking it into smaller steps.`
+        : 'Stopped.';
       emitChatEvent({ type: 'assistant_message', chatId: chatIdStr, content: msg, source: 'telegram' });
       await ctx.reply(msg);
       return;
@@ -564,10 +575,6 @@ async function handleMessage(ctx: Context, message: string, forceVoiceReply = fa
     // Skip logging for synthetic messages like /respin to avoid self-referential growth.
     if (!skipLog) {
       saveConversationTurn(chatIdStr, message, rawResponse, result.newSessionId ?? sessionId, AGENT_ID);
-      // Auto-log every processed message to hive_mind for real-time dashboard accuracy
-      const msgSnippet = message.slice(0, 100).replace(/\n/g, ' ');
-      const resSnippet = rawResponse.slice(0, 150).replace(/\n/g, ' ');
-      logToHiveMind(AGENT_ID, chatIdStr, 'message_processed', `Q: ${msgSnippet} → A: ${resSnippet}`);
       // Fire-and-forget: evaluate which surfaced memories were useful
       if (surfacedMemoryIds.length > 0) {
         void evaluateMemoryRelevance(surfacedMemoryIds, surfacedMemorySummaries, message, rawResponse).catch(() => {});
@@ -667,7 +674,9 @@ async function handleMessage(ctx: Context, message: string, forceVoiceReply = fa
         await ctx.reply('Claude Code subprocess failed to start. Check logs or try /newchat.');
       }
     } else {
-      await ctx.reply('Something went wrong. Check the logs and try again.');
+      // Show the actual error so users can diagnose without digging through logs
+      const shortErr = errMsg.length > 300 ? errMsg.slice(0, 300) + '...' : errMsg;
+      await ctx.reply(`Something went wrong:\n\n${shortErr}\n\nTry /newchat or check the terminal logs.`);
     }
   }
 }
@@ -732,7 +741,7 @@ export function createBot(): Bot {
 
   const bot = new Bot(token);
 
-  // Reject group chats. BusinessOS only works in private (1-on-1) chats.
+  // Reject group chats. RawClaw only works in private (1-on-1) chats.
   // This prevents message leakage if the bot is added to a group.
   bot.use(async (ctx, next) => {
     if (ctx.chat && ctx.chat.type !== 'private') {
@@ -782,7 +791,7 @@ export function createBot(): Bot {
   bot.command('help', (ctx) => {
     if (!isAuthorised(ctx.chat!.id)) return;
     return ctx.reply(
-      'BusinessOS — Commands\n\n' +
+      'RawClaw — Commands\n\n' +
       '/newchat — Start a new Claude session\n' +
       '/respin — Reload recent context\n' +
       '/voice — Toggle voice mode on/off\n' +
@@ -816,7 +825,7 @@ export function createBot(): Bot {
     if (AGENT_ID !== 'main') {
       return ctx.reply(`${AGENT_ID.charAt(0).toUpperCase() + AGENT_ID.slice(1)} agent online.`);
     }
-    return ctx.reply('BusinessOS online. What do you need?');
+    return ctx.reply('RawClaw online. What do you need?');
   });
 
   // /newchat — clear Claude session, start fresh + auto-commit to hive mind
@@ -836,7 +845,9 @@ export function createBot(): Bot {
           const turns = getSessionConversation(sessionToSummarize, 40);
           if (turns.length < 2) return;
 
+          // Timeout after 60s to prevent a stuck summarization from running indefinitely
           const summaryAbort = new AbortController();
+          const summaryTimer = setTimeout(() => summaryAbort.abort(), 60_000);
 
           const result = await runAgent(
             'Summarize what we accomplished this session in ONE short sentence (under 100 chars). No preamble, no quotes, just the summary. Example: "Drafted LinkedIn post about AI agents and scheduled Gmail triage task"',
@@ -846,6 +857,7 @@ export function createBot(): Bot {
             undefined,
             summaryAbort,
           );
+          clearTimeout(summaryTimer);
 
           const summary = result.text?.trim();
           if (summary && summary.length > 0) {
@@ -1074,10 +1086,16 @@ export function createBot(): Bot {
       await ctx.reply('Dashboard not configured. Set DASHBOARD_TOKEN in .env and restart.');
       return;
     }
+    // Read DASHBOARD_URL fresh from .env each time (tunnel URL may have changed)
+    const freshEnv = readEnvFile(['DASHBOARD_URL']);
+    const base = freshEnv.DASHBOARD_URL || DASHBOARD_URL || `http://localhost:${DASHBOARD_PORT}`;
     const chatIdStr = ctx.chat!.id.toString();
-    const base = DASHBOARD_URL || `http://localhost:${DASHBOARD_PORT}`;
     const url = `${base}/?token=${DASHBOARD_TOKEN}&chatId=${chatIdStr}`;
-    await ctx.reply(url);
+    // Send as both a clickable HTML link AND the raw URL so it always works
+    await ctx.reply(
+      `<a href="${url}">${url}</a>`,
+      { parse_mode: 'HTML', link_preview_options: { is_disabled: false } },
+    );
   });
 
   // /stop — interrupt the current agent query
@@ -1350,7 +1368,7 @@ export function createBot(): Bot {
     if (!isAuthorised(chatId)) return;
     if (!ALLOWED_CHAT_ID) {
       await ctx.reply(
-        `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart BusinessOS.`,
+        `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart RawClaw.`,
       );
       return;
     }
@@ -1375,7 +1393,7 @@ export function createBot(): Bot {
     if (!isAuthorised(chatId)) return;
     if (!ALLOWED_CHAT_ID) {
       await ctx.reply(
-        `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart BusinessOS.`,
+        `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart RawClaw.`,
       );
       return;
     }
@@ -1398,7 +1416,7 @@ export function createBot(): Bot {
     if (!isAuthorised(chatId)) return;
     if (!ALLOWED_CHAT_ID) {
       await ctx.reply(
-        `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart BusinessOS.`,
+        `Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart RawClaw.`,
       );
       return;
     }
@@ -1421,7 +1439,7 @@ export function createBot(): Bot {
     const chatId = ctx.chat!.id;
     if (!isAuthorised(chatId)) return;
     if (!ALLOWED_CHAT_ID) {
-      await ctx.reply(`Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart BusinessOS.`);
+      await ctx.reply(`Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart RawClaw.`);
       return;
     }
 
@@ -1443,7 +1461,7 @@ export function createBot(): Bot {
     const chatId = ctx.chat!.id;
     if (!isAuthorised(chatId)) return;
     if (!ALLOWED_CHAT_ID) {
-      await ctx.reply(`Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart BusinessOS.`);
+      await ctx.reply(`Your chat ID is ${chatId}.\n\nAdd this to your .env:\n\nALLOWED_CHAT_ID=${chatId}\n\nThen restart RawClaw.`);
       return;
     }
 
@@ -1522,6 +1540,10 @@ async function processDashboardMessage(
 
     const abortCtrl = new AbortController();
     setActiveAbort(chatIdStr, abortCtrl);
+    const dashTimeout = setTimeout(() => {
+      logger.warn({ chatId: chatIdStr, timeoutMs: AGENT_TIMEOUT_MS }, 'Dashboard agent query timed out, aborting');
+      abortCtrl.abort();
+    }, AGENT_TIMEOUT_MS);
 
     const result = await runAgent(
       fullMessage,
@@ -1532,11 +1554,14 @@ async function processDashboardMessage(
       abortCtrl,
     );
 
+    clearTimeout(dashTimeout);
     setActiveAbort(chatIdStr, null);
 
     // Handle abort
     if (result.aborted) {
-      const msg = 'Stopped.';
+      const msg = result.text === null
+        ? `Timed out after ${Math.round(AGENT_TIMEOUT_MS / 1000)}s. Try breaking the task into smaller steps.`
+        : 'Stopped.';
       emitChatEvent({ type: 'assistant_message', chatId: chatIdStr, content: msg, source: 'dashboard' });
       return;
     }
@@ -1612,101 +1637,4 @@ export async function notifyWhatsAppIncoming(
   } catch (err) {
     logger.error({ err }, 'Failed to send WhatsApp notification');
   }
-}
-
-// ── Slack message processing ──────────────────────────────────────────
-
-/**
- * Process a message from Slack. Runs the agent pipeline and returns
- * the response text. Called from slack-events.ts via the handler callback.
- */
-export async function processMessageFromSlack(
-  text: string,
-  channel: string,
-  threadTs: string,
-): Promise<string> {
-  const chatIdStr = ALLOWED_CHAT_ID || 'slack';
-
-  return new Promise<string>((resolve) => {
-    messageQueue.enqueue(chatIdStr, async () => {
-      try {
-        emitChatEvent({ type: 'user_message', chatId: chatIdStr, content: `[Slack] ${text}`, source: 'slack' });
-        setProcessing(chatIdStr, true);
-
-        const sessionId = getSession(chatIdStr, AGENT_ID);
-
-        const { contextText: memCtx, surfacedMemoryIds, surfacedMemorySummaries } = await buildMemoryContext(chatIdStr, text, AGENT_ID);
-        const parts: string[] = [];
-        if (agentSystemPrompt && !sessionId) parts.push(`[Agent role — follow these instructions]\n${agentSystemPrompt}\n[End agent role]`);
-        if (memCtx) parts.push(memCtx);
-
-        const recentTasks = getRecentTaskOutputs(AGENT_ID, 30);
-        if (recentTasks.length > 0) {
-          const taskLines = recentTasks.map((t) => {
-            const ago = Math.round((Date.now() / 1000 - t.last_run) / 60);
-            return `[Scheduled task ran ${ago}m ago]\nTask: ${t.prompt}\nOutput:\n${t.last_result}`;
-          });
-          parts.push(`[Recent scheduled task context]\n${taskLines.join('\n\n')}\n[End task context]`);
-        }
-
-        parts.push(`[Message from Slack channel ${channel}]\n${text}`);
-        const fullMessage = parts.join('\n\n');
-
-        const abortCtrl = new AbortController();
-        setActiveAbort(chatIdStr, abortCtrl);
-
-        const result = await runAgent(
-          fullMessage,
-          sessionId,
-          () => {},
-          () => {},
-          agentDefaultModel,
-          abortCtrl,
-        );
-
-        setActiveAbort(chatIdStr, null);
-
-        if (result.aborted) {
-          resolve('Stopped.');
-          return;
-        }
-
-        if (result.newSessionId) {
-          setSession(chatIdStr, result.newSessionId, AGENT_ID);
-        }
-
-        const rawResponse = result.text?.trim() || 'Done.';
-
-        saveConversationTurn(chatIdStr, text, rawResponse, result.newSessionId ?? sessionId, AGENT_ID);
-        if (surfacedMemoryIds.length > 0) {
-          void evaluateMemoryRelevance(surfacedMemoryIds, surfacedMemorySummaries, text, rawResponse).catch(() => {});
-        }
-
-        emitChatEvent({ type: 'assistant_message', chatId: chatIdStr, content: rawResponse, source: 'slack' });
-
-        if (result.usage) {
-          try {
-            saveTokenUsage(
-              chatIdStr,
-              result.newSessionId ?? sessionId,
-              result.usage.inputTokens,
-              result.usage.outputTokens,
-              result.usage.lastCallCacheRead,
-              result.usage.lastCallCacheRead + result.usage.lastCallInputTokens,
-              result.usage.totalCostUsd,
-              result.usage.didCompact,
-              AGENT_ID,
-            );
-          } catch {}
-        }
-
-        resolve(rawResponse);
-      } catch (err) {
-        logger.error({ err, channel }, 'Slack message processing failed');
-        resolve('Something went wrong processing that message.');
-      } finally {
-        setProcessing(chatIdStr, false);
-      }
-    });
-  });
 }

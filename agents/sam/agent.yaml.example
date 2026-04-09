@@ -1,0 +1,6 @@
+name: Sam
+description: Finance -- budgets, P&L, invoices, forecasting, financial reports
+
+telegram_bot_token_env: SAM_BOT_TOKEN
+
+model: claude-sonnet-4-5

@@ -35,7 +35,7 @@ function loadBanner(): string {
   try {
     return fs.readFileSync(path.join(PROJECT_ROOT, 'banner.txt'), 'utf-8');
   } catch {
-    return '\n  BusinessOS\n';
+    return '\n  RawClaw\n';
   }
 }
 
@@ -145,39 +145,13 @@ async function main() {
 
   // ── 1. Banner + intro ────────────────────────────────────────────────────
   console.log(`${c.cyan}${c.bold}${loadBanner()}${c.reset}`);
-  console.log(`  ${c.bold}Welcome to BusinessOS.${c.reset}`);
+  console.log(`  ${c.bold}Welcome to RawClaw.${c.reset}`);
   console.log();
   info('This wizard will get you set up in about 5 minutes.');
   info('Press Ctrl+C at any time to exit. You can re-run this at any time with: npm run setup');
   console.log();
 
-  // ── 2. What is BusinessOS ────────────────────────────────────────────────
-  section('What is BusinessOS?');
-
-  console.log(`  BusinessOS bridges your Claude Code CLI to Telegram.`);
-  console.log(`  You message your bot from your phone. BusinessOS runs the`);
-  console.log(`  ${c.bold}actual${c.reset} ${c.cyan}claude${c.reset} CLI on your computer — with all your skills,`);
-  console.log(`  tools, and context — and sends the result back to you.`);
-  console.log();
-  console.log(`  ${c.bold}It is not a chatbot wrapper.${c.reset} It runs real Claude Code.`);
-  console.log(`  Everything you can do in your terminal, you can do from your phone.`);
-  console.log();
-
-  bullet('Text, voice, photos, documents, and videos');
-  bullet('All your installed Claude Code skills auto-load');
-  bullet('Persistent memory across messages');
-  bullet('Scheduled autonomous tasks (cron)');
-  bullet('Optional WhatsApp bridge');
-  console.log();
-
-  const understood = await confirm('Ready to continue?');
-  if (!understood) {
-    console.log();
-    info('Come back when you\'re ready. Run npm run setup to start again.');
-    return;
-  }
-
-  // ── 3. System checks ─────────────────────────────────────────────────────
+  // ── 2. System checks ─────────────────────────────────────────────────────
   section('System checks');
 
   // Node
@@ -218,12 +192,36 @@ async function main() {
     process.exit(1);
   }
 
-  // Claude auth
+  // Claude auth — check if logged in, offer to log in if not
+  let claudeAuthed = false;
   try {
-    execSync('claude --version', { stdio: 'pipe' });
+    const authCheck = execSync('claude auth status', { stdio: 'pipe', timeout: 10000 }).toString();
+    if (authCheck.toLowerCase().includes('logged in') || authCheck.toLowerCase().includes('authenticated')) {
+      claudeAuthed = true;
+    }
+  } catch { /* auth status command may not exist in older versions */ }
+
+  if (!claudeAuthed) {
+    // Fallback: check if ~/.claude/ has auth files
+    try {
+      const claudeDir = path.join(os.homedir(), '.claude');
+      const hasAuth = fs.existsSync(claudeDir) && fs.readdirSync(claudeDir).some(f => f.includes('auth') || f.includes('credentials') || f.includes('oauth'));
+      if (hasAuth) claudeAuthed = true;
+    } catch { }
+  }
+
+  if (claudeAuthed) {
     ok('Claude auth — logged in');
-  } catch {
-    warn('Could not verify Claude auth. If you\'re not logged in, run: claude login');
+  } else {
+    warn('Claude not logged in yet');
+    info('Running claude login now (follow the browser prompt)...');
+    console.log();
+    const loginResult = spawnSync('claude', ['login'], { stdio: 'inherit', timeout: 120000 });
+    if (loginResult.status === 0) {
+      ok('Claude login complete');
+    } else {
+      warn('Claude login skipped. Run "claude login" manually before starting the bot.');
+    }
   }
 
   // Git config (user.name and user.email)
@@ -250,6 +248,21 @@ async function main() {
     }
   }
 
+  // Dependencies check
+  const nodeModulesExists = fs.existsSync(path.join(PROJECT_ROOT, 'node_modules'));
+  if (nodeModulesExists) {
+    ok('Dependencies installed (node_modules/)');
+  } else {
+    warn('Dependencies not installed — running npm install...');
+    const install = spawnSync('npm', ['install'], { cwd: PROJECT_ROOT, stdio: 'inherit' });
+    if (install.status === 0) {
+      ok('Dependencies installed');
+    } else {
+      fail('npm install failed. Check your Node.js installation and try again.');
+      process.exit(1);
+    }
+  }
+
   // Build check
   const distExists = fs.existsSync(path.join(PROJECT_ROOT, 'dist', 'index.js'));
   if (distExists) {
@@ -268,7 +281,7 @@ async function main() {
   // ── 4. What do you want to enable? ──────────────────────────────────────
   section('Choose your features');
 
-  info('BusinessOS has several optional features. Tell us what you want.');
+  info('RawClaw has several optional features. Tell us what you want.');
   info('You can always add more later by editing .env and restarting.');
   console.log();
 
@@ -278,13 +291,14 @@ async function main() {
     : false;
   const wantVideo = await confirm('Video analysis? (send video clips → analyzed by Google Gemini)', false);
   const wantWhatsApp = await confirm('WhatsApp bridge? (view and reply to WhatsApp from Telegram)', false);
+  const wantSlack = await confirm('Slack integration? (read and post to Slack channels from Telegram)', false);
 
   // WhatsApp explanation if they said yes
   if (wantWhatsApp) {
     console.log();
     console.log(`  ${c.bold}How the WhatsApp bridge works:${c.reset}`);
     console.log();
-    info('BusinessOS uses whatsapp-web.js to connect to your existing WhatsApp');
+    info('RawClaw uses whatsapp-web.js to connect to your existing WhatsApp');
     info('account via the Linked Devices feature (same as WhatsApp Web).');
     console.log();
     info('A separate process (wa-daemon) runs in the background:');
@@ -310,81 +324,46 @@ async function main() {
     console.log();
   }
 
-  // ── 5. Explore the ecosystem ─────────────────────────────────────────────
-  section('The Claw ecosystem');
-
-  info('BusinessOS is one of several "Claw" projects. You might want to');
-  info('look at others for inspiration or to use a different channel:');
-  console.log();
-  bullet(`${c.bold}NanoClaw${c.reset}  github.com/qwibitai/nanoclaw       — WhatsApp, isolated containers`);
-  bullet(`${c.bold}OpenClaw${c.reset}  github.com/openclaw/openclaw       — 10+ channels (Slack, Discord, iMessage...)`);
-  bullet(`${c.bold}TinyClaw${c.reset}  github.com/jlia0/tinyclaw          — ~400 lines shell, no Node`);
-  console.log();
-
-  const cloneInspiration = await confirm('Clone any of these repos to browse locally?', false);
-  if (cloneInspiration) {
-    console.log();
-    info('Which ones? (space-separated: nanoclaw openclaw tinyclaw)');
-    const picks = await ask('Repos to clone', 'skip');
-    if (picks !== 'skip' && picks.trim()) {
-      const map: Record<string, string> = {
-        nanoclaw: 'https://github.com/qwibitai/nanoclaw.git',
-        openclaw: 'https://github.com/openclaw/openclaw.git',
-        tinyclaw: 'https://github.com/jlia0/tinyclaw.git',
-      };
-      const cloneDir = path.join(PROJECT_ROOT, '..', 'claw-inspiration');
-      fs.mkdirSync(cloneDir, { recursive: true });
-      for (const name of picks.toLowerCase().split(/\s+/)) {
-        const url = map[name];
-        if (url) {
-          const s = spinner(`Cloning ${name}...`);
-          const r = spawnSync('git', ['clone', url, path.join(cloneDir, name)], { stdio: 'pipe' });
-          r.status === 0 ? s.stop('ok', `Cloned ${name} → ${cloneDir}/${name}`) : s.stop('warn', `Could not clone ${name}`);
-        }
-      }
-    }
-  }
-
-  // ── 6. Config directory (BUSINESSOS_CONFIG) ──────────────────────────────
-  section('Config directory (BUSINESSOS_CONFIG)');
+  // ── 5. Config directory (RAWCLAW_CONFIG) ──────────────────────────────
+  section('Config directory (RAWCLAW_CONFIG)');
 
   info('Personal config files (CLAUDE.md, agent configs) live outside the repo');
-  info('so they are never accidentally committed. Defaults to ~/.businessos');
+  info('so they are never accidentally committed. Defaults to ~/.rawclaw');
   console.log();
 
   const envForConfig = parseEnvFile(path.join(PROJECT_ROOT, '.env'));
   const defaultConfigDir = expandHome(
-    envForConfig.BUSINESSOS_CONFIG || '~/.businessos',
+    envForConfig.RAWCLAW_CONFIG || '~/.rawclaw',
   );
   info(`Current path: ${defaultConfigDir}`);
   console.log();
 
-  let businessosConfigDir = defaultConfigDir;
+  let rawclawConfigDir = defaultConfigDir;
   const changeConfigDir = await confirm('Change this path?', false);
   if (changeConfigDir) {
-    const input = await ask('Config directory', '~/.businessos');
-    businessosConfigDir = expandHome(input.trim() || '~/.businessos');
+    const input = await ask('Config directory', '~/.rawclaw');
+    rawclawConfigDir = expandHome(input.trim() || '~/.rawclaw');
   }
 
   // If the chosen directory already exists, notify and let user decide
-  if (fs.existsSync(businessosConfigDir)) {
-    const hasClaudeMd = fs.existsSync(path.join(businessosConfigDir, 'CLAUDE.md'));
+  if (fs.existsSync(rawclawConfigDir)) {
+    const hasClaudeMd = fs.existsSync(path.join(rawclawConfigDir, 'CLAUDE.md'));
     ok(`Directory already exists${hasClaudeMd ? ' — CLAUDE.md found' : ' — no CLAUDE.md yet'}`);
     const useExisting = await confirm('Use this directory as-is?', true);
     if (!useExisting) {
       const newPath = await ask('Enter a different path');
-      if (newPath.trim()) businessosConfigDir = expandHome(newPath.trim());
+      if (newPath.trim()) rawclawConfigDir = expandHome(newPath.trim());
     }
   }
 
   // Create the directory if needed
-  if (!fs.existsSync(businessosConfigDir)) {
-    fs.mkdirSync(businessosConfigDir, { recursive: true });
-    ok(`Created ${businessosConfigDir}`);
+  if (!fs.existsSync(rawclawConfigDir)) {
+    fs.mkdirSync(rawclawConfigDir, { recursive: true });
+    ok(`Created ${rawclawConfigDir}`);
   }
 
   // Ensure CLAUDE.md exists in the config dir (copy from example if needed)
-  const claudeMdDest = path.join(businessosConfigDir, 'CLAUDE.md');
+  const claudeMdDest = path.join(rawclawConfigDir, 'CLAUDE.md');
   if (!fs.existsSync(claudeMdDest)) {
     const exampleSrc = path.join(PROJECT_ROOT, 'CLAUDE.md.example');
     if (fs.existsSync(exampleSrc)) {
@@ -397,22 +376,44 @@ async function main() {
     ok(`CLAUDE.md exists at ${claudeMdDest}`);
   }
 
-  // ── 6b. CLAUDE.md personalization ────────────────────────────────────────
-  section('Personalize your assistant (CLAUDE.md)');
+  // ── 5b. CLAUDE.md personalization ────────────────────────────────────────
+  section('Personalize your assistant');
 
-  info('CLAUDE.md is the personality and context file loaded into every session.');
-  info('It defines who your assistant is, what you do, and how it communicates.');
-  console.log();
-  info('At minimum, replace the [BRACKETED] placeholders:');
-  bullet('[YOUR ASSISTANT NAME]  — what you want to call the bot');
-  bullet('[YOUR NAME]            — your name (so it knows who it\'s talking to)');
-  bullet('[YOUR_OBSIDIAN_VAULT]  — path to your Obsidian vault, if you use one');
-  console.log();
-  info('The more context you add, the better it performs without explaining things');
-  info('in every message. Think of it as a system prompt that persists everywhere.');
+  info('A few quick questions to set up your assistant\'s personality.');
+  info('These get written into CLAUDE.md, the file loaded into every session.');
   console.log();
 
-  const openClaude = await confirm('Open CLAUDE.md now to edit it?', true);
+  const assistantName = await ask('What should your assistant be called?', 'Jarvis');
+  const ownerName = await ask('What\'s your name?');
+  const ownerRole = await ask('What do you do? (e.g. "I run a marketing agency")', '');
+  const obsidianPath = await ask('Obsidian vault path (leave blank to skip)', '');
+
+  // Replace placeholders in CLAUDE.md
+  if (fs.existsSync(claudeMdDest)) {
+    let claudeContent = fs.readFileSync(claudeMdDest, 'utf-8');
+    if (assistantName) {
+      claudeContent = claudeContent.replace(/\[YOUR ASSISTANT NAME\]/g, assistantName);
+    }
+    if (ownerName) {
+      claudeContent = claudeContent.replace(/\[YOUR NAME\]/g, ownerName);
+      claudeContent = claudeContent.replace(/\[YOUR_NAME\]/g, ownerName);
+    }
+    if (obsidianPath) {
+      claudeContent = claudeContent.replace(/\[YOUR_OBSIDIAN_VAULT_PATH\]/g, expandHome(obsidianPath));
+      claudeContent = claudeContent.replace(/\[YOUR_OBSIDIAN_VAULT\]/g, expandHome(obsidianPath));
+    }
+    if (ownerRole) {
+      claudeContent = claudeContent.replace(
+        /\[YOUR NAME\] \[does what you do\]\. \[Brief description[^\]]*\]/g,
+        `${ownerName || assistantName} ${ownerRole}`
+      );
+    }
+    fs.writeFileSync(claudeMdDest, claudeContent, 'utf-8');
+    ok(`CLAUDE.md personalized — assistant: ${assistantName}, owner: ${ownerName || '(not set)'}`);
+  }
+
+  console.log();
+  const openClaude = await confirm('Open CLAUDE.md to review or add more context?', false);
   if (openClaude) {
     const editor = process.env.EDITOR || (PLATFORM === 'win32' ? 'notepad' : 'nano');
     try {
@@ -425,7 +426,7 @@ async function main() {
   // ── 7. Skills to install ─────────────────────────────────────────────────
   section('Skills you might want');
 
-  info('BusinessOS auto-loads every skill in ~/.claude/skills/.');
+  info('RawClaw auto-loads every skill in ~/.claude/skills/.');
   info('Here are the most useful ones to install:');
   console.log();
 
@@ -440,7 +441,7 @@ async function main() {
   if (wantVideo) {
     console.log(`  ${c.bold}Gemini skill (required for video analysis):${c.reset}`);
     console.log();
-    info('BusinessOS\'s video analysis uses the gemini-api-dev skill from Google.');
+    info('RawClaw\'s video analysis uses the gemini-api-dev skill from Google.');
     info('It handles text, images, audio, video, function calling, and structured output.');
     info('Install it from: https://github.com/google-gemini/gemini-skills');
     console.log();
@@ -459,8 +460,8 @@ async function main() {
   const envPath = path.join(PROJECT_ROOT, '.env');
   const env: Record<string, string> = fs.existsSync(envPath) ? parseEnvFile(envPath) : {};
 
-  // Persist BUSINESSOS_CONFIG determined in section 6
-  env.BUSINESSOS_CONFIG = businessosConfigDir;
+  // Persist RAWCLAW_CONFIG determined in section 6
+  env.RAWCLAW_CONFIG = rawclawConfigDir;
 
   let botUsername = '';
   if (env.TELEGRAM_BOT_TOKEN) {
@@ -520,10 +521,42 @@ async function main() {
     if (chatId !== 'skip' && chatId) env.ALLOWED_CHAT_ID = chatId;
   }
 
+  // ── 8b. Slack (optional) ────────────────────────────────────────────────
+  if (wantSlack) {
+    section('Slack integration');
+
+    console.log(`  ${c.bold}How the Slack integration works:${c.reset}`);
+    console.log();
+    info('RawClaw uses a Slack User Token to read and post messages');
+    info('on your behalf. This lets you interact with Slack channels');
+    info('directly from Telegram.');
+    console.log();
+    info('To get your Slack User Token:');
+    bullet('Go to https://api.slack.com/apps');
+    bullet('Create a new app (or select an existing one)');
+    bullet('Go to OAuth & Permissions');
+    bullet('Add the scopes you need (e.g. channels:read, chat:write, users:read)');
+    bullet('Install the app to your workspace');
+    bullet('Copy the User OAuth Token (starts with xoxp-)');
+    console.log();
+
+    if (env.SLACK_USER_TOKEN) {
+      ok('Slack User Token already configured');
+    } else {
+      const token = await ask('Slack User Token (xoxp-...) — Enter to skip');
+      if (token) {
+        env.SLACK_USER_TOKEN = token;
+        ok('Slack User Token saved');
+      } else {
+        info('Skipped. Add SLACK_USER_TOKEN to .env later.');
+      }
+    }
+  }
+
   // ── 9. Security ──────────────────────────────────────────────────────────
   section('Secure your bot');
 
-  info('BusinessOS has full access to your machine. If someone gets into');
+  info('RawClaw has full access to your machine. If someone gets into');
   info('your Telegram account, they control the bot. These layers protect you.');
   console.log();
 
@@ -533,66 +566,16 @@ async function main() {
   }
   ok('Dashboard token set');
 
-  // PIN lock
-  console.log();
-  info('PIN lock: like a password for the bot. Even if someone opens your');
-  info('Telegram, they can\'t use the bot without the PIN.');
-  console.log();
-
+  // Security is opt-in — skip PIN and kill phrase by default for clean first-run experience.
+  // Users can add SECURITY_PIN_HASH and EMERGENCY_KILL_PHRASE to .env later.
   if (env.SECURITY_PIN_HASH) {
     ok('PIN lock already configured');
-  } else {
-    const wantPin = await confirm('Set up a PIN lock?');
-    if (wantPin) {
-      let pinSet = false;
-      while (!pinSet) {
-        const pin = await ask('Choose a PIN (4+ characters)');
-        if (!pin || pin.length < 4) {
-          console.log(`  ${c.red}PIN must be at least 4 characters.${c.reset}`);
-          continue;
-        }
-        const pinConfirm = await ask('Confirm PIN');
-        if (pin !== pinConfirm) {
-          console.log(`  ${c.red}PINs don't match. Try again.${c.reset}`);
-          continue;
-        }
-        // Salted hash: "salt:hash"
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = crypto.createHash('sha256').update(salt + pin).digest('hex');
-        env.SECURITY_PIN_HASH = `${salt}:${hash}`;
-        ok('PIN set. Bot will start locked, send the PIN to unlock.');
-        pinSet = true;
-      }
-
-      // Idle timeout (only ask when PIN is set)
-      console.log();
-      info('Auto-lock re-locks the bot after a period of inactivity.');
-      const idleMin = await ask('Lock after how many minutes idle?', '30');
-      const idleVal = parseInt(idleMin) || 0;
-      if (idleVal > 0) {
-        env.IDLE_LOCK_MINUTES = String(idleVal);
-        ok(`Auto-lock after ${idleVal}m of inactivity`);
-      }
-    } else {
-      info('Skipped. Add SECURITY_PIN_HASH to .env later if you change your mind.');
-    }
   }
-
-  // Emergency kill phrase (auto-generate with option to customize)
-  console.log();
   if (env.EMERGENCY_KILL_PHRASE) {
     ok('Emergency kill phrase already configured');
   } else {
-    info('Kill phrase: a word you send to immediately shut down all agents.');
-    info('Useful if something goes wrong or you suspect unauthorized access.');
-    console.log();
-    const defaultPhrase = 'EMERGENCY_STOP_' + crypto.randomBytes(3).toString('hex').toUpperCase();
-    const killPhrase = await ask('Kill phrase (Enter for auto-generated)', defaultPhrase);
-    if (killPhrase && killPhrase.length >= 4) {
-      env.EMERGENCY_KILL_PHRASE = killPhrase;
-      ok('Kill phrase saved');
-      info(`Remember it: ${killPhrase}`);
-    }
+    // Auto-generate a kill phrase silently so the feature works if needed
+    env.EMERGENCY_KILL_PHRASE = 'EMERGENCY_STOP_' + crypto.randomBytes(3).toString('hex').toUpperCase();
   }
 
   // ── 10. Voice keys ────────────────────────────────────────────────────────
@@ -648,22 +631,8 @@ async function main() {
     }
   }
 
-  // ── 11. Optional Claude API key ───────────────────────────────────────────
-  section('Claude authentication');
-
-  info('By default, BusinessOS uses your existing claude login (Max plan).');
-  info('This is fine for personal use on your own machine.');
-  console.log();
-  info('Set an API key if you\'re deploying on a server, or want pay-per-token');
-  info('billing instead of using your subscription limits.');
-  console.log();
-
-  if (env.ANTHROPIC_API_KEY) {
-    ok('API key already configured');
-  } else {
-    const key = await ask('Anthropic API key — optional (Enter to skip)');
-    if (key) env.ANTHROPIC_API_KEY = key;
-  }
+  // Claude auth — uses `claude login` OAuth by default, no key needed.
+  // ANTHROPIC_API_KEY is preserved if already set but not prompted for.
 
   // ── Write .env ────────────────────────────────────────────────────────
   console.log();
@@ -671,7 +640,7 @@ async function main() {
   await sleep(300);
 
   const lines = [
-    '# BusinessOS — generated by setup wizard',
+    '# RawClaw — generated by setup wizard',
     '# Edit freely. Re-run: npm run setup',
     '',
     '# ── Required ──────────────────────────────────────────────────',
@@ -679,7 +648,7 @@ async function main() {
     `ALLOWED_CHAT_ID=${env.ALLOWED_CHAT_ID || ''}`,
     '',
     '# ── Config directory (personal config, never committed) ───────',
-    `BUSINESSOS_CONFIG=${env.BUSINESSOS_CONFIG || ''}`,
+    `RAWCLAW_CONFIG=${env.RAWCLAW_CONFIG || ''}`,
     '',
     '# ── Claude auth (optional — uses claude login by default) ─────',
     `ANTHROPIC_API_KEY=${env.ANTHROPIC_API_KEY || ''}`,
@@ -691,6 +660,7 @@ async function main() {
     '',
     '# ── Integrations ──────────────────────────────────────────────',
     `GOOGLE_API_KEY=${env.GOOGLE_API_KEY || ''}`,
+    `SLACK_USER_TOKEN=${env.SLACK_USER_TOKEN || ''}`,
     '',
     '# ── Dashboard ─────────────────────────────────────────────────',
     `DASHBOARD_TOKEN=${env.DASHBOARD_TOKEN || ''}`,
@@ -708,7 +678,7 @@ async function main() {
   ];
 
   // Preserve unknown keys
-  const known = new Set(['TELEGRAM_BOT_TOKEN','ALLOWED_CHAT_ID','BUSINESSOS_CONFIG','ANTHROPIC_API_KEY','GROQ_API_KEY','ELEVENLABS_API_KEY','ELEVENLABS_VOICE_ID','GOOGLE_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','WHATSAPP_ENABLED','DB_ENCRYPTION_KEY','DASHBOARD_TOKEN','DASHBOARD_PORT','DASHBOARD_URL','SECURITY_PIN_HASH','IDLE_LOCK_MINUTES','EMERGENCY_KILL_PHRASE','DESTRUCTIVE_CONFIRM']);
+  const known = new Set(['TELEGRAM_BOT_TOKEN','ALLOWED_CHAT_ID','RAWCLAW_CONFIG','ANTHROPIC_API_KEY','GROQ_API_KEY','ELEVENLABS_API_KEY','ELEVENLABS_VOICE_ID','GOOGLE_API_KEY','SLACK_USER_TOKEN','CLAUDE_CODE_OAUTH_TOKEN','WHATSAPP_ENABLED','DB_ENCRYPTION_KEY','DASHBOARD_TOKEN','DASHBOARD_PORT','DASHBOARD_URL','SECURITY_PIN_HASH','IDLE_LOCK_MINUTES','EMERGENCY_KILL_PHRASE','DESTRUCTIVE_CONFIRM']);
   for (const [k, v] of Object.entries(env)) {
     if (!known.has(k) && v) lines.push(`${k}=${v}`);
   }
@@ -718,6 +688,9 @@ async function main() {
   const written = parseEnvFile(envPath);
   const keyCount = Object.values(written).filter(Boolean).length;
   sw.stop('ok', `.env saved (${keyCount} key${keyCount !== 1 ? 's' : ''} configured)`);
+
+  // Cloudflare tunnel starts automatically when the bot runs (prestart hook).
+  // No need to start it during setup since the dashboard server isn't running yet.
 
   // ── 13. Auto-start service ───────────────────────────────────────────────
   if (PLATFORM === 'darwin') {
@@ -729,7 +702,7 @@ async function main() {
   } else {
     section('Auto-start');
     info('Unknown platform. Start manually: npm start');
-    info('Or use PM2: pm2 start dist/index.js --name businessos && pm2 save');
+    info('Or use PM2: pm2 start dist/index.js --name rawclaw && pm2 save');
   }
 
   // ── macOS permissions warning ──────────────────────────────────────────
@@ -760,7 +733,7 @@ async function main() {
   // ── 15. Multi-agent setup (optional) ────────────────────────────────────
   section('Agent team (optional)');
 
-  info('BusinessOS can run specialist agents alongside the main bot.');
+  info('RawClaw can run specialist agents alongside the main bot.');
   info('Each agent is its own Telegram bot with a focused role, its own');
   info('context window, and its own chat on your phone.');
   console.log();
@@ -800,10 +773,97 @@ async function main() {
     info('Full guide: see "Creating a team of agents" in the README.');
   }
 
-  // ── 16. Summary ───────────────────────────────────────────────────────────
+  // ── 16. Supabase (v2 feature) ─────────────────────────────────────────────
+  section('Cloud Sync — Supabase (optional)');
+
+  info('Supabase enables cloud memory persistence, multi-machine sync,');
+  info('and cross-agent memory sharing. It is OPTIONAL — Raw Claw works');
+  info('fully offline with just SQLite.');
+  console.log();
+
+  const wantSupabase = await confirm('Enable Supabase cloud sync?', false);
+  if (wantSupabase) {
+    const supabaseUrl = await ask('Supabase project URL (e.g., https://xxx.supabase.co)');
+    if (supabaseUrl) {
+      env.SUPABASE_URL = supabaseUrl;
+      const serviceKey = await ask('Service role key (starts with eyJ...)');
+      if (serviceKey) env.SUPABASE_SERVICE_KEY = serviceKey;
+      const anonKey = await ask('Anon key (optional, for RLS-scoped access)');
+      if (anonKey) env.SUPABASE_ANON_KEY = anonKey;
+      const companyId = await ask('Company ID (for multi-tenant isolation)', 'default');
+      if (companyId) env.COMPANY_ID = companyId;
+
+      // Test connection
+      const sp = spinner('Testing Supabase connection...');
+      try {
+        const resp = await fetch(`${supabaseUrl}/rest/v1/`, {
+          headers: { 'apikey': serviceKey || anonKey || '' },
+        });
+        if (resp.ok) {
+          sp.stop('ok', 'Supabase connected');
+        } else {
+          sp.stop('warn', `Supabase returned ${resp.status} — check your keys`);
+        }
+      } catch (e) {
+        sp.stop('fail', `Could not reach Supabase: ${String(e)}`);
+      }
+
+      // Append Supabase keys to .env (written after main .env save)
+      const sbLines = [
+        '',
+        '# ── Supabase Cloud Sync ───────────────────────────────────────',
+        `SUPABASE_URL=${env.SUPABASE_URL || ''}`,
+        `SUPABASE_SERVICE_KEY=${env.SUPABASE_SERVICE_KEY || ''}`,
+        `SUPABASE_ANON_KEY=${env.SUPABASE_ANON_KEY || ''}`,
+        `COMPANY_ID=${env.COMPANY_ID || ''}`,
+      ];
+      fs.appendFileSync(envPath, sbLines.join('\n') + '\n', 'utf-8');
+      ok('Supabase keys saved to .env');
+    }
+  }
+
+  // ── 16b. Budget governance (v2 feature) ──────────────────────────────────
+  section('Budget Governance (optional)');
+
+  info('Set daily/monthly spending limits per agent to prevent runaway costs.');
+  info('Agents will auto-pause when they exceed their budget.');
+  console.log();
+
+  const wantBudget = await confirm('Configure budget limits?', false);
+  let dailyBudget = '';
+  let monthlyBudget = '';
+  if (wantBudget) {
+    dailyBudget = await ask('Daily budget limit in USD (e.g., 5.00)', '5.00');
+    monthlyBudget = await ask('Monthly budget limit in USD (e.g., 100.00)', '100.00');
+    env.BUDGET_DAILY_LIMIT = dailyBudget;
+    env.BUDGET_MONTHLY_LIMIT = monthlyBudget;
+    ok(`Budget: $${dailyBudget}/day, $${monthlyBudget}/month`);
+  }
+
+  // ── 16c. Discord webhook (v2 feature) ────────────────────────────────────
+  section('Discord Notifications (optional)');
+
+  info('Post heartbeat alerts, budget warnings, and task notifications to Discord.');
+  console.log();
+
+  const wantDiscord = await confirm('Enable Discord webhook notifications?', false);
+  if (wantDiscord) {
+    const webhookUrl = await ask('Discord webhook URL');
+    if (webhookUrl) {
+      env.DISCORD_WEBHOOK_URL = webhookUrl;
+      ok('Discord webhook configured');
+    }
+    const botToken = await ask('Discord bot token (optional, for DM support)');
+    if (botToken) {
+      env.DISCORD_BOT_TOKEN = botToken;
+      ok('Discord bot token set');
+    }
+  }
+
+  // ── 17. Summary ───────────────────────────────────────────────────────────
   console.log();
   console.log(`  ${c.cyan}╔════════════════════════════════════════════╗${c.reset}`);
-  console.log(`  ${c.cyan}║${c.reset}${c.bold}           BusinessOS is ready!             ${c.reset}${c.cyan}║${c.reset}`);
+  console.log(`  ${c.cyan}║${c.reset}${c.bold}           RawClaw is ready!             ${c.reset}${c.cyan}║${c.reset}`);
   console.log(`  ${c.cyan}╚════════════════════════════════════════════╝${c.reset}`);
   console.log();
 
@@ -814,6 +874,7 @@ async function main() {
   wantVoiceOut && env.ELEVENLABS_API_KEY ? ok('Voice output: ElevenLabs ✓') : wantVoiceOut ? warn('Voice output: ElevenLabs keys not set') : info('Voice output: not enabled');
   wantVideo && env.GOOGLE_API_KEY ? ok('Video analysis: Gemini ✓') : wantVideo ? warn('Video analysis: GOOGLE_API_KEY not set') : info('Video analysis: not enabled');
   wantWhatsApp ? ok('WhatsApp: run npx tsx scripts/wa-daemon.ts to connect') : info('WhatsApp: not enabled');
+  wantSlack && env.SLACK_USER_TOKEN ? ok('Slack: connected') : wantSlack ? warn('Slack: SLACK_USER_TOKEN not set') : info('Slack: not enabled');
 
   console.log();
   console.log(`  ${c.bold}Start the bot:${c.reset}`);
@@ -824,14 +885,128 @@ async function main() {
   console.log(`  ${c.bold}Check health:${c.reset}`);
   console.log(`  ${c.cyan}npm run status${c.reset}`);
   console.log();
+
+  // ── Tailscale SSH access ──────────────────────────────────────────────────
+  let tsInstalled = false;
+  try {
+    execSync('which tailscale', { stdio: 'pipe' });
+    tsInstalled = true;
+  } catch { }
+
+  if (tsInstalled) {
+    section('Remote SSH Access (Tailscale)');
+
+    // Check if Tailscale is already connected
+    let tsIp = '';
+    try {
+      tsIp = execSync('tailscale ip -4', { stdio: 'pipe', timeout: 5000 }).toString().trim();
+    } catch { }
+
+    if (!tsIp) {
+      info('Tailscale is installed but not connected.');
+      info('Starting Tailscale now (this may open a browser for login)...');
+      console.log();
+      const tsUp = spawnSync('sudo', ['tailscale', 'up', '--ssh'], { stdio: 'inherit', timeout: 120000 });
+      if (tsUp.status === 0) {
+        try {
+          tsIp = execSync('tailscale ip -4', { stdio: 'pipe', timeout: 5000 }).toString().trim();
+        } catch { }
+      }
+    }
+
+    if (tsIp) {
+      const user = process.env.USER || process.env.USERNAME || 'user';
+      const hostname = os.hostname();
+      ok(`Tailscale connected: ${tsIp}`);
+      console.log();
+
+      console.log(`  ${c.bold}SSH into this machine:${c.reset}`);
+      console.log(`  ${c.cyan}ssh ${user}@${tsIp}${c.reset}`);
+      console.log();
+
+      // Team access
+      info('Want to give your team SSH access to this machine?');
+      info('They need Tailscale installed on their device and to be on your Tailscale network.');
+      console.log();
+
+      const addTeam = await confirm('Share access with your Raw Growth team (Alex & Chris)?', true);
+      if (addTeam) {
+        console.log();
+        info('To add team members to your Tailscale network:');
+        console.log();
+        console.log(`  ${c.bold}1.${c.reset} Go to ${c.cyan}https://login.tailscale.com/admin/users${c.reset}`);
+        console.log(`  ${c.bold}2.${c.reset} Click ${c.bold}Invite users${c.reset}`);
+        console.log(`  ${c.bold}3.${c.reset} Enter their email addresses`);
+        console.log();
+        info('Once they accept and install Tailscale, they can SSH in with:');
+        console.log();
+        console.log(`  ${c.cyan}ssh ${user}@${tsIp}${c.reset}`);
+        console.log();
+        info('Or by machine name:');
+        console.log(`  ${c.cyan}ssh ${user}@${hostname}${c.reset}`);
+        console.log();
+
+        // Send SSH command to Telegram so the team has it
+        if (env.TELEGRAM_BOT_TOKEN && env.ALLOWED_CHAT_ID) {
+          const sshMsg = [
+            'Tailscale SSH access configured.',
+            '',
+            'SSH commands for team:',
+            `ssh ${user}@${tsIp}`,
+            `ssh ${user}@${hostname}`,
+            '',
+            'Team members need:',
+            '1. Tailscale installed on their device',
+            '2. An invite from your Tailscale admin panel',
+            '   https://login.tailscale.com/admin/users',
+          ].join('\n');
+          try {
+            const tgUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+            await fetch(tgUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: env.ALLOWED_CHAT_ID, text: sshMsg }),
+            });
+            ok('SSH details sent to Telegram');
+          } catch { }
+        }
+      }
+    } else {
+      warn('Tailscale did not connect. Run manually: sudo tailscale up --ssh');
+    }
+  }
+  console.log();
+
   if (PLATFORM === 'darwin') {
-    info('Logs: tail -f /tmp/businessos.log');
+    info('Logs: tail -f /tmp/rawclaw.log');
   } else if (PLATFORM === 'linux') {
-    info('Logs: journalctl --user -u businessos -f');
+    info('Logs: journalctl --user -u rawclaw -f');
   }
   console.log();
   info('Edit CLAUDE.md any time to change personality, add context, or update skills.');
   info('Re-run npm run setup to change API keys or service settings.');
+  console.log();
+
+  // ── Send "I'm live" Telegram message ────────────────────────────────────
+  if (env.TELEGRAM_BOT_TOKEN && env.ALLOWED_CHAT_ID) {
+    const hostname = os.hostname();
+    const liveMsg = `RawClaw is live on ${hostname}.\n\nClaude Code is connected. Send me a message to get started.`;
+    try {
+      const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: env.ALLOWED_CHAT_ID, text: liveMsg }),
+      });
+      if (resp.ok) {
+        ok('Sent "I\'m live" message to Telegram');
+      } else {
+        warn('Could not send Telegram message -- check bot token and chat ID');
+      }
+    } catch {
+      warn('Could not reach Telegram API');
+    }
+  }
   console.log();
 }
 
@@ -839,7 +1014,7 @@ async function main() {
 async function setupMacOS() {
   section('Auto-start (macOS)');
 
-  const dest = path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.[COMPANY_DOMAIN_REVERSED].app.plist');
+  const dest = path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.rawclaw.app.plist');
   const installed = fs.existsSync(dest);
 
   if (installed) {
@@ -857,7 +1032,7 @@ async function setupMacOS() {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.[COMPANY_DOMAIN_REVERSED].app</string>
+  <key>Label</key><string>com.rawclaw.app</string>
   <key>ProgramArguments</key>
   <array>
     <string>${process.execPath}</string>
@@ -867,8 +1042,8 @@ async function setupMacOS() {
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>5</integer>
-  <key>StandardOutPath</key><string>/tmp/businessos.log</string>
-  <key>StandardErrorPath</key><string>/tmp/businessos.err</string>
+  <key>StandardOutPath</key><string>/tmp/rawclaw.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rawclaw.err</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>NODE_ENV</key><string>production</string>
@@ -881,7 +1056,7 @@ async function setupMacOS() {
     fs.writeFileSync(dest, plist, 'utf-8');
     execSync(`launchctl load "${dest}"`, { stdio: 'pipe' });
     s.stop('ok', 'Service installed — starts automatically on login');
-    info('Logs: tail -f /tmp/businessos.log');
+    info('Logs: tail -f /tmp/rawclaw.log');
   } catch {
     s.stop('warn', 'Could not install automatically');
     info(`Manual install: launchctl load "${dest}"`);
@@ -895,16 +1070,16 @@ async function setupLinux() {
   const install = await confirm('Install as a systemd user service?');
   if (!install) {
     info('Start manually: npm start');
-    info('Or: pm2 start dist/index.js --name businessos && pm2 save');
+    info('Or: pm2 start dist/index.js --name rawclaw && pm2 save');
     return;
   }
 
   const s = spinner('Installing systemd service...');
   try {
     const serviceDir = path.join(os.homedir(), '.config', 'systemd', 'user');
-    const servicePath = path.join(serviceDir, 'businessos.service');
+    const servicePath = path.join(serviceDir, 'rawclaw.service');
     const service = `[Unit]
-Description=BusinessOS Telegram Bot
+Description=RawClaw Telegram Bot
 After=network.target
 
 [Service]
@@ -924,10 +1099,10 @@ WantedBy=default.target
     fs.mkdirSync(serviceDir, { recursive: true });
     fs.writeFileSync(servicePath, service, 'utf-8');
     execSync('systemctl --user daemon-reload', { stdio: 'pipe' });
-    execSync('systemctl --user enable businessos', { stdio: 'pipe' });
-    execSync('systemctl --user start businessos', { stdio: 'pipe' });
+    execSync('systemctl --user enable rawclaw', { stdio: 'pipe' });
+    execSync('systemctl --user start rawclaw', { stdio: 'pipe' });
     s.stop('ok', `Service installed at ${servicePath}`);
-    info('Logs: journalctl --user -u businessos -f');
+    info('Logs: journalctl --user -u rawclaw -f');
   } catch {
     s.stop('warn', 'Could not install automatically');
     info('See README.md for manual systemd setup instructions.');
@@ -941,12 +1116,12 @@ function setupWindows() {
   warn('Windows detected.');
   console.log();
   info('Option A — WSL2 (recommended):');
-  info('  Install WSL2, clone BusinessOS inside the WSL2 filesystem,');
+  info('  Install WSL2, clone RawClaw inside the WSL2 filesystem,');
   info('  and re-run setup. Keep ~/.claude/ inside WSL2, not the Windows mount.');
   console.log();
   info('Option B — PM2 (native Windows):');
   console.log(`  ${c.cyan}npm install -g pm2${c.reset}`);
-  console.log(`  ${c.cyan}pm2 start dist/index.js --name businessos${c.reset}`);
+  console.log(`  ${c.cyan}pm2 start dist/index.js --name rawclaw${c.reset}`);
   console.log(`  ${c.cyan}pm2 save${c.reset}`);
   console.log(`  ${c.cyan}pm2 startup${c.reset}  ${c.gray}# follow the instructions it prints${c.reset}`);
 }

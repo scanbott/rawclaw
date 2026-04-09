@@ -1,5 +1,5 @@
 /**
- * Security module for BusinessOS.
+ * Security module for RawClaw.
  *
  * Layers:
  * 1. PIN lock + idle auto-lock: session must be unlocked before commands execute
@@ -132,7 +132,7 @@ export function checkKillPhrase(message: string): boolean {
 
 /**
  * Execute the emergency shutdown.
- * Stops all BusinessOS services and force-exits after a brief timeout.
+ * Stops all RawClaw services and force-exits after a brief timeout.
  */
 export function executeEmergencyKill(): void {
   logger.warn('EMERGENCY KILL activated');
@@ -142,20 +142,20 @@ export function executeEmergencyKill(): void {
 
   try {
     if (os.platform() === 'darwin') {
-      // Stop all BusinessOS launchd services
+      // Stop all RawClaw launchd services
       try {
         const output = execSync('launchctl list 2>/dev/null', { encoding: 'utf-8', timeout: 3000 });
         for (const line of output.split('\n')) {
           const cols = line.trim().split(/\s+/);
           const label = cols[cols.length - 1]; // label is the last column
-          if (label && label.startsWith('com.businessos.')) {
+          if (label && label.startsWith('com.rawclaw.')) {
             try { execSync(`launchctl stop "${label}"`, { stdio: 'ignore', timeout: 2000 }); } catch { /* ok */ }
           }
         }
       } catch { /* launchctl failed, still exit */ }
     } else if (os.platform() === 'linux') {
       try {
-        execSync('systemctl --user stop "com.businessos.*" 2>/dev/null', { stdio: 'ignore', timeout: 3000 });
+        execSync('systemctl --user stop "com.rawclaw.*" 2>/dev/null', { stdio: 'ignore', timeout: 3000 });
       } catch { /* ok */ }
     }
   } catch { /* don't let anything prevent exit */ }

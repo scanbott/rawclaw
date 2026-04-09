@@ -4,25 +4,32 @@ import path from 'path';
 import { loadAgentConfig, resolveAgentDir, resolveAgentClaudeMd } from './agent-config.js';
 import { createBot } from './bot.js';
 import { checkPendingMigrations } from './migrations.js';
-import { ALLOWED_CHAT_ID, activeBotToken, STORE_DIR, PROJECT_ROOT, BUSINESSOS_CONFIG, GOOGLE_API_KEY, setAgentOverrides, SECURITY_PIN_HASH, IDLE_LOCK_MINUTES, EMERGENCY_KILL_PHRASE } from './config.js';
+import { ALLOWED_CHAT_ID, activeBotToken, STORE_DIR, PROJECT_ROOT, RAWCLAW_CONFIG, GOOGLE_API_KEY, setAgentOverrides, SECURITY_PIN_HASH, IDLE_LOCK_MINUTES, EMERGENCY_KILL_PHRASE } from './config.js';
 import { startDashboard } from './dashboard.js';
-import { setSlackMessageHandler } from './integrations/slack-events.js';
-import { initDatabase, cleanupOldMissionTasks, insertAuditLog } from './db.js';
+import { initDatabase, cleanupOldMissionTasks, insertAuditLog, getDbTableNames, getMemoryCount, getAllScheduledTasks, insertHeartbeatRun, updateHeartbeatRun, getTokenSpendForBudget, getBudgetPolicies, clearSessionForAgent } from './db.js';
 import { initSecurity, setAuditCallback } from './security.js';
 import { logger } from './logger.js';
 import { cleanupOldUploads } from './media.js';
-import { runConsolidation } from './memory/consolidate.js';
-import { runDecaySweep } from './memory/index.js';
+import { runConsolidation } from './memory-consolidate.js';
+import { runDecaySweep } from './memory.js';
 import { initOrchestrator } from './orchestrator.js';
 import { initScheduler } from './scheduler.js';
 import { setTelegramConnected, setBotInfo } from './state.js';
+
+// v2 modules
+import { registerHeartbeatDb } from './heartbeat.js';
+import { registerBudgetDb } from './budget.js';
+import { registerHealthDb } from './health.js';
+import { registerSessionDb } from './session-compaction.js';
+import { startHealthMonitor, stopHealthMonitor } from './health.js';
+import { loadPlugins, shutdownPlugins } from './plugins.js';
 
 // Parse --agent flag
 const agentFlagIndex = process.argv.indexOf('--agent');
 const AGENT_ID = agentFlagIndex !== -1 ? process.argv[agentFlagIndex + 1] : 'main';
 
 // Export AGENT_ID to env so child processes (schedule-cli, etc.) inherit it
-process.env.BUSINESSOS_AGENT_ID = AGENT_ID;
+process.env.RAWCLAW_AGENT_ID = AGENT_ID;
 
 if (AGENT_ID !== 'main') {
   const agentConfig = loadAgentConfig(AGENT_ID);
@@ -44,11 +51,11 @@ if (AGENT_ID !== 'main') {
   });
   logger.info({ agentId: AGENT_ID, name: agentConfig.name }, 'Running as agent');
 } else {
-  // For main bot: read CLAUDE.md from BUSINESSOS_CONFIG and inject it as
+  // For main bot: read CLAUDE.md from RAWCLAW_CONFIG and inject it as
   // systemPrompt — the same pattern used by sub-agents. Never copy the file
-  // into the repo; that defeats the purpose of BUSINESSOS_CONFIG and risks
+  // into the repo; that defeats the purpose of RAWCLAW_CONFIG and risks
   // accidentally committing personal config.
-  const externalClaudeMd = path.join(BUSINESSOS_CONFIG, 'CLAUDE.md');
+  const externalClaudeMd = path.join(RAWCLAW_CONFIG, 'CLAUDE.md');
   if (fs.existsSync(externalClaudeMd)) {
     let systemPrompt: string | undefined;
     try {
@@ -61,17 +68,17 @@ if (AGENT_ID !== 'main') {
         cwd: PROJECT_ROOT,
         systemPrompt,
       });
-      logger.info({ source: externalClaudeMd }, 'Loaded CLAUDE.md from BUSINESSOS_CONFIG');
+      logger.info({ source: externalClaudeMd }, 'Loaded CLAUDE.md from RAWCLAW_CONFIG');
     }
   } else if (!fs.existsSync(path.join(PROJECT_ROOT, 'CLAUDE.md'))) {
     logger.warn(
       'No CLAUDE.md found. Copy CLAUDE.md.example to %s/CLAUDE.md and customize it.',
-      BUSINESSOS_CONFIG,
+      RAWCLAW_CONFIG,
     );
   }
 }
 
-const PID_FILE = path.join(STORE_DIR, `${AGENT_ID === 'main' ? 'businessos' : `agent-${AGENT_ID}`}.pid`);
+const PID_FILE = path.join(STORE_DIR, `${AGENT_ID === 'main' ? 'rawclaw' : `agent-${AGENT_ID}`}.pid`);
 
 function showBanner(): void {
   const bannerPath = path.join(PROJECT_ROOT, 'banner.txt');
@@ -79,7 +86,7 @@ function showBanner(): void {
     const banner = fs.readFileSync(bannerPath, 'utf-8');
     console.log('\n' + banner);
   } catch {
-    console.log('\n  BusinessOS\n');
+    console.log('\n  RawClaw\n');
   }
 }
 
@@ -125,6 +132,25 @@ async function main(): Promise<void> {
   initDatabase();
   logger.info('Database ready');
 
+  // v2: Wire up module registrations (avoids circular imports)
+  registerHeartbeatDb({
+    insertRun: insertHeartbeatRun,
+    updateRun: updateHeartbeatRun,
+  });
+  registerBudgetDb({
+    getSpend: getTokenSpendForBudget,
+    getPolicies: getBudgetPolicies,
+  });
+  registerHealthDb({
+    getDbTableNames,
+    getMemoryCount,
+    getScheduledTasks: getAllScheduledTasks,
+  });
+  registerSessionDb({
+    clearSession: clearSessionForAgent,
+  });
+  logger.info('v2 modules registered');
+
   // Initialize security (PIN lock, kill phrase, destructive confirmation, audit)
   initSecurity({
     pinHash: SECURITY_PIN_HASH || undefined,
@@ -136,6 +162,17 @@ async function main(): Promise<void> {
   });
 
   initOrchestrator();
+
+  // v2: Load plugins and start health monitor (main process only)
+  if (AGENT_ID === 'main') {
+    try {
+      await loadPlugins();
+      logger.info('Plugins loaded');
+    } catch (e) {
+      logger.warn({ error: String(e) }, 'Plugin loading failed (non-fatal)');
+    }
+    startHealthMonitor();
+  }
 
   // Decay and consolidation run ONLY in the main process to prevent
   // multi-process over-decay (5x decay on simultaneous restart) and
@@ -169,12 +206,8 @@ async function main(): Promise<void> {
   const bot = createBot();
 
   // Dashboard only runs in the main bot process
-  if (AGENT_ID === 'scan') {
+  if (AGENT_ID === 'main') {
     startDashboard(bot.api);
-
-    // Register Slack message handler so Slack events route through the agent
-    const { processMessageFromSlack } = await import('./bot.js');
-    setSlackMessageHandler(processMessageFromSlack);
   }
 
   if (ALLOWED_CHAT_ID) {
@@ -198,6 +231,8 @@ async function main(): Promise<void> {
 
   const shutdown = async () => {
     logger.info('Shutting down...');
+    stopHealthMonitor();
+    await shutdownPlugins();
     setTelegramConnected(false);
     releaseLock();
     await bot.stop();
@@ -206,21 +241,21 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
 
-  logger.info({ agentId: AGENT_ID }, 'Starting BusinessOS...');
+  logger.info({ agentId: AGENT_ID }, 'Starting RawClaw...');
 
   await bot.start({
     onStart: (botInfo) => {
       setTelegramConnected(true);
-      setBotInfo(botInfo.username ?? '', botInfo.first_name ?? 'BusinessOS');
-      logger.info({ username: botInfo.username }, 'BusinessOS is running');
+      setBotInfo(botInfo.username ?? '', botInfo.first_name ?? 'RawClaw');
+      logger.info({ username: botInfo.username }, 'RawClaw is running');
       if (AGENT_ID === 'main') {
-        console.log(`\n  BusinessOS online: @${botInfo.username}`);
+        console.log(`\n  RawClaw online: @${botInfo.username}`);
         if (!ALLOWED_CHAT_ID) {
           console.log(`  Send /chatid to get your chat ID for ALLOWED_CHAT_ID`);
         }
         console.log();
       } else {
-        console.log(`\n  BusinessOS agent [${AGENT_ID}] online: @${botInfo.username}\n`);
+        console.log(`\n  RawClaw agent [${AGENT_ID}] online: @${botInfo.username}\n`);
       }
     },
   });

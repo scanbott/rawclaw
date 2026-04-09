@@ -1,13 +1,13 @@
 #!/bin/bash
-# Uninstall all BusinessOS launchd agents
+# Uninstall all RawClaw launchd agents
 set -e
 
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 
-echo "Uninstalling BusinessOS launchd agents..."
+echo "Uninstalling RawClaw launchd agents..."
 echo ""
 
-for plist in "$LAUNCH_AGENTS_DIR"/com.[COMPANY_DOMAIN_REVERSED].*.plist; do
+for plist in "$LAUNCH_AGENTS_DIR"/com.rawclaw.*.plist; do
   [ -f "$plist" ] || continue
   label=$(basename "$plist" .plist)
   echo "Unloading $label..."
@@ -17,5 +17,5 @@ for plist in "$LAUNCH_AGENTS_DIR"/com.[COMPANY_DOMAIN_REVERSED].*.plist; do
 done
 
 echo ""
-echo "All BusinessOS agents uninstalled."
+echo "All RawClaw agents uninstalled."
 echo "Processes will stop within a few seconds."

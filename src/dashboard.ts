@@ -105,11 +105,41 @@ export function startDashboard(botApi?: Api<RawApi>): void {
 
   const app = new Hono();
 
+  // In-memory session store (maps session ID -> { authed: true, created: timestamp })
+  const sessions = new Map<string, { authed: boolean; created: number }>();
+
+  function generateSessionId(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  function parseCookies(header: string | undefined): Record<string, string> {
+    if (!header) return {};
+    return Object.fromEntries(header.split(';').map(c => {
+      const [k, ...v] = c.trim().split('=');
+      return [k, v.join('=')];
+    }));
+  }
+
+  function isAuthenticated(c: any): boolean {
+    const cookies = parseCookies(c.req.header('cookie'));
+    const sid = cookies['rawclaw_session'];
+    if (!sid) return false;
+    const session = sessions.get(sid);
+    if (!session || !session.authed) return false;
+    // Sessions expire after 24 hours
+    if (Date.now() - session.created > 24 * 60 * 60 * 1000) {
+      sessions.delete(sid);
+      return false;
+    }
+    return true;
+  }
+
   // CORS headers for cross-origin access (Cloudflare tunnel, mobile browsers)
   app.use('*', async (c, next) => {
-    c.header('Access-Control-Allow-Origin', '*');
+    c.header('Access-Control-Allow-Origin', c.req.header('origin') || '*');
     c.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS');
     c.header('Access-Control-Allow-Headers', 'Content-Type');
+    c.header('Access-Control-Allow-Credentials', 'true');
     if (c.req.method === 'OPTIONS') return c.body(null, 204);
     await next();
   });
@@ -120,19 +150,61 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     return c.json({ error: 'Internal server error' }, 500);
   });
 
-  // Token auth middleware
+  // ── Login endpoint (no auth required) ──────────────────────────────────
+  app.post('/api/login', async (c) => {
+    const body = await c.req.json<{ password?: string }>().catch(() => ({ password: '' }));
+    const password = (body as any)?.password?.trim() || '';
+    if (!password || password !== DASHBOARD_TOKEN) {
+      return c.json({ error: 'Invalid password' }, 401);
+    }
+    const sid = generateSessionId();
+    sessions.set(sid, { authed: true, created: Date.now() });
+    c.header('Set-Cookie', `rawclaw_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+    return c.json({ ok: true });
+  });
+
+  // ── Logout endpoint ────────────────────────────────────────────────────
+  app.post('/api/logout', (c) => {
+    const cookies = parseCookies(c.req.header('cookie'));
+    const sid = cookies['rawclaw_session'];
+    if (sid) sessions.delete(sid);
+    c.header('Set-Cookie', 'rawclaw_session=; Path=/; HttpOnly; Max-Age=0');
+    return c.json({ ok: true });
+  });
+
+  // ── Auth check endpoint (no auth required) ─────────────────────────────
+  app.get('/api/auth-check', (c) => {
+    return c.json({ authenticated: isAuthenticated(c) });
+  });
+
+  // ── Auth middleware — everything below requires session cookie ──────────
+  // Allow: /health (no auth), /api/login, /api/logout, /api/auth-check, GET / (serves login page)
   app.use('*', async (c, next) => {
-    const token = c.req.query('token');
-    if (!DASHBOARD_TOKEN || !token || token !== DASHBOARD_TOKEN) {
+    const path = c.req.path;
+    // Public routes
+    if (path === '/api/login' || path === '/api/logout' || path === '/api/auth-check' || path === '/health') {
+      return next();
+    }
+    // Serve dashboard page (includes login screen) — always accessible
+    if (path === '/' && c.req.method === 'GET') {
+      return next();
+    }
+    // Also support legacy ?token= in URL for backward compat (but token is NOT exposed in HTML anymore)
+    const urlToken = c.req.query('token');
+    if (urlToken && urlToken === DASHBOARD_TOKEN) {
+      return next();
+    }
+    // Check session cookie
+    if (!isAuthenticated(c)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     await next();
   });
 
-  // Serve dashboard HTML
+  // Serve dashboard HTML (no token passed to HTML anymore)
   app.get('/', (c) => {
     const chatId = c.req.query('chatId') || '';
-    return c.html(getDashboardHtml(DASHBOARD_TOKEN, chatId));
+    return c.html(getDashboardHtml('', chatId));
   });
 
   // Scheduled tasks
@@ -663,6 +735,84 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     }
   });
 
+  // ── Supabase Explorer endpoints ──────────────────────────────────────
+
+  // List all Supabase tables
+  app.get('/api/supabase/tables', async (c) => {
+    const { supabaseEnabled, SUPABASE_URL, SUPABASE_SERVICE_KEY } = await import('./supabase.js');
+    if (!supabaseEnabled) return c.json({ error: 'Supabase not configured' }, 400);
+
+    try {
+      // The PostgREST root returns an OpenAPI spec -- parse paths for table names
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_SERVICE_KEY || '',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY || ''}`,
+        },
+      });
+      if (!resp.ok) return c.json({ error: 'Failed to list tables' }, 500);
+      const spec = await resp.json() as { paths?: Record<string, unknown> };
+      const paths = spec.paths || {};
+      const tables = Object.keys(paths)
+        .filter(p => !p.startsWith('/rpc/'))
+        .map(p => p.replace(/^\//, ''))
+        .filter(Boolean)
+        .map(name => ({ name, type: 'supabase' }));
+      return c.json({ tables });
+    } catch (e) {
+      return c.json({ error: String(e) }, 500);
+    }
+  });
+
+  // Get rows from a Supabase table
+  app.get('/api/supabase/tables/:name', async (c) => {
+    const { supabaseEnabled, getSupabaseClient } = await import('./supabase.js');
+    if (!supabaseEnabled) return c.json({ error: 'Supabase not configured' }, 400);
+    const client = getSupabaseClient();
+    if (!client) return c.json({ error: 'Supabase client not available' }, 500);
+
+    const tableName = c.req.param('name');
+    const page = parseInt(c.req.query('page') || '1', 10);
+    const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50', 10)));
+    const offset = (page - 1) * limit;
+    const sort = c.req.query('sort');
+    const order = c.req.query('order') === 'desc' ? 'desc' : 'asc';
+
+    const query = `select=*&limit=${limit}&offset=${offset}` +
+      (sort ? `&order=${sort}.${order}` : '') +
+      '&' ; // trailing & is harmless
+
+    const result = await client.select(tableName, query, { count: true });
+    if (result.error) return c.json({ error: result.error.message }, 500);
+
+    const rows = result.data || [];
+    const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+
+    return c.json({
+      columns,
+      rows,
+      rowCount: result.count || rows.length,
+      page,
+      limit,
+      totalPages: Math.ceil((result.count || rows.length) / limit),
+    });
+  });
+
+  // Insert a row into a Supabase table
+  app.post('/api/supabase/tables/:name', async (c) => {
+    const { supabaseEnabled, getSupabaseClient } = await import('./supabase.js');
+    if (!supabaseEnabled) return c.json({ error: 'Supabase not configured' }, 400);
+    const client = getSupabaseClient();
+    if (!client) return c.json({ error: 'Supabase client not available' }, 500);
+
+    const tableName = c.req.param('name');
+    const body = await c.req.json();
+    const result = await client.insert(tableName, body);
+    if (result.error) return c.json({ error: result.error.message }, 500);
+    return c.json({ success: true, data: result.data });
+  });
+
   // ── Chat endpoints ─────────────────────────────────────────────────
 
   // SSE stream for real-time chat updates
@@ -742,7 +892,160 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     return c.json({ ok: aborted });
   });
 
-  serve({ fetch: app.fetch, port: DASHBOARD_PORT }, () => {
+  // ── v2 Endpoints: Health, Budget, Heartbeat, Audit, Plugins ────────
+
+  // Health check endpoint (no auth required)
+  app.get('/health', async (c) => {
+    const { getHealthStatus } = await import('./health.js');
+    const health = await getHealthStatus();
+    const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+    return c.json(health, statusCode);
+  });
+
+  // Heartbeat runs
+  app.get('/api/heartbeat/runs', async (c) => {
+    const { getRecentRuns } = await import('./heartbeat.js');
+    const limit = parseInt(c.req.query('limit') || '50', 10);
+    const agentId = c.req.query('agentId');
+    const runs = getRecentRuns(limit, agentId || undefined);
+    return c.json({ runs });
+  });
+
+  app.get('/api/heartbeat/stats', async (c) => {
+    const agentId = c.req.query('agentId') || AGENT_ID;
+    const { getAgentStats } = await import('./heartbeat.js');
+    const stats = getAgentStats(agentId);
+    return c.json(stats);
+  });
+
+  app.get('/api/heartbeat/active', async (c) => {
+    const { getActiveRuns } = await import('./heartbeat.js');
+    return c.json({ runs: getActiveRuns() });
+  });
+
+  // Budget endpoints
+  app.get('/api/budget/policies', async (c) => {
+    const { getAllPolicies } = await import('./budget.js');
+    return c.json({ policies: getAllPolicies() });
+  });
+
+  app.post('/api/budget/policies', async (c) => {
+    const { createBudgetPolicy } = await import('./budget.js');
+    const body = await c.req.json<{
+      scope: 'agent' | 'company';
+      scope_id: string;
+      window: 'daily' | 'monthly' | 'lifetime';
+      limit_usd: number;
+      warning_threshold?: number;
+      auto_pause?: boolean;
+    }>();
+    if (!body.scope || !body.scope_id || !body.window || !body.limit_usd) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+    const policy = createBudgetPolicy(body.scope, body.scope_id, body.window, body.limit_usd, {
+      warningThreshold: body.warning_threshold,
+      autoPause: body.auto_pause,
+    });
+    return c.json({ policy });
+  });
+
+  app.delete('/api/budget/policies/:id', async (c) => {
+    const { deleteBudgetPolicy } = await import('./budget.js');
+    const deleted = deleteBudgetPolicy(c.req.param('id'));
+    return c.json({ ok: deleted });
+  });
+
+  app.get('/api/budget/summary/:agentId', async (c) => {
+    const { getAgentBudgetSummary } = await import('./budget.js');
+    const summary = getAgentBudgetSummary(c.req.param('agentId'));
+    return c.json(summary);
+  });
+
+  app.get('/api/budget/incidents', async (c) => {
+    const { getRecentIncidents } = await import('./budget.js');
+    const limit = parseInt(c.req.query('limit') || '50', 10);
+    return c.json({ incidents: getRecentIncidents(limit) });
+  });
+
+  app.post('/api/budget/pause/:agentId', async (c) => {
+    const { pauseAgent } = await import('./budget.js');
+    pauseAgent(c.req.param('agentId'));
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/budget/resume/:agentId', async (c) => {
+    const { resumeAgent } = await import('./budget.js');
+    resumeAgent(c.req.param('agentId'));
+    return c.json({ ok: true });
+  });
+
+  // Activity audit log
+  app.get('/api/activity', async (c) => {
+    const { getRecentActivity } = await import('./audit.js');
+    const limit = parseInt(c.req.query('limit') || '50', 10);
+    const offset = parseInt(c.req.query('offset') || '0', 10);
+    return c.json({ entries: getRecentActivity(limit, offset) });
+  });
+
+  app.get('/api/activity/entity/:type', async (c) => {
+    const { getActivityByEntity } = await import('./audit.js');
+    const limit = parseInt(c.req.query('limit') || '50', 10);
+    return c.json({ entries: getActivityByEntity(c.req.param('type'), limit) });
+  });
+
+  // Session compaction status
+  app.get('/api/sessions/health', async (c) => {
+    const { getSessionHealthSummary } = await import('./session-compaction.js');
+    return c.json({ sessions: getSessionHealthSummary() });
+  });
+
+  app.get('/api/sessions/config', async (c) => {
+    const { getCompactionConfig } = await import('./session-compaction.js');
+    return c.json(getCompactionConfig());
+  });
+
+  // Plugins
+  app.get('/api/plugins', async (c) => {
+    const { getPlugins } = await import('./plugins.js');
+    return c.json({ plugins: getPlugins() });
+  });
+
+  app.get('/api/plugins/tools', async (c) => {
+    const { getPluginTools } = await import('./plugins.js');
+    return c.json({ tools: getPluginTools() });
+  });
+
+  // Discord adapter info
+  app.get('/api/discord/status', async (c) => {
+    const { discordEnabled, DISCORD_WEBHOOK_URL } = await import('./discord.js');
+    return c.json({
+      enabled: discordEnabled,
+      webhook_configured: !!DISCORD_WEBHOOK_URL,
+    });
+  });
+
+  // Supabase status
+  app.get('/api/supabase/status', async (c) => {
+    const { supabaseEnabled, getSupabaseClient } = await import('./supabase.js');
+    let connected = false;
+    if (supabaseEnabled) {
+      const client = getSupabaseClient();
+      if (client) {
+        connected = await client.healthCheck();
+      }
+    }
+    return c.json({ enabled: supabaseEnabled, connected });
+  });
+
+  const server = serve({ fetch: app.fetch, port: DASHBOARD_PORT }, () => {
     logger.info({ port: DASHBOARD_PORT }, 'Dashboard server running');
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.warn({ port: DASHBOARD_PORT }, 'Dashboard port already in use -- skipping dashboard (kill the other process or change DASHBOARD_PORT in .env)');
+    } else {
+      logger.error({ err }, 'Dashboard server error');
+    }
   });
 }

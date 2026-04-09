@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raw Growth AI Infrastructure</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --bg:#0a0a12;
+    --surface:rgba(255,255,255,.04);
+    --surface-hover:rgba(255,255,255,.07);
+    --border:rgba(255,255,255,.08);
+    --border-accent:rgba(255,255,255,.14);
+    --text:#e4e4ed;
+    --text-muted:#8a8a9a;
+    --text-dim:#5c5c6e;
+    --accent-claw:#6e56ff;
+    --accent-claw-glow:rgba(110,86,255,.18);
+    --accent-gateway:#00c9a7;
+    --accent-gateway-glow:rgba(0,201,167,.18);
+    --radius:16px;
+    --radius-sm:10px;
+  }
+
+  html{font-size:16px;scroll-behavior:smooth}
+
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.65;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* subtle radial glow behind the page */
+  body::before{
+    content:'';
+    position:fixed;
+    top:-30%;left:50%;
+    width:120vw;height:80vh;
+    transform:translateX(-50%);
+    background:radial-gradient(ellipse at center,rgba(110,86,255,.06) 0%,transparent 70%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .wrapper{
+    position:relative;
+    z-index:1;
+    max-width:1120px;
+    margin:0 auto;
+    padding:0 24px;
+  }
+
+  /* ── Header ── */
+  header{
+    text-align:center;
+    padding:72px 0 48px;
+  }
+  header .logo{
+    font-size:.8rem;
+    letter-spacing:.25em;
+    text-transform:uppercase;
+    color:var(--text-muted);
+    margin-bottom:20px;
+  }
+  header h1{
+    font-size:clamp(1.8rem,4.5vw,2.8rem);
+    font-weight:700;
+    letter-spacing:-.02em;
+    line-height:1.2;
+    background:linear-gradient(135deg,#fff 30%,#9b8aff 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+  header p.subtitle{
+    margin-top:12px;
+    font-size:1.05rem;
+    color:var(--text-muted);
+  }
+
+  /* ── Section Titles ── */
+  .section-label{
+    text-align:center;
+    margin:56px 0 32px;
+  }
+  .section-label h2{
+    font-size:1.15rem;
+    font-weight:600;
+    color:var(--text-muted);
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+
+  /* ── Card Grid ── */
+  .cards{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:28px;
+  }
+  @media(max-width:720px){
+    .cards{grid-template-columns:1fr}
+  }
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:36px 32px 32px;
+    backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);
+    transition:border-color .3s,box-shadow .3s;
+    position:relative;
+    overflow:hidden;
+  }
+  .card::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:var(--radius);
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .35s;
+  }
+  .card:hover{border-color:var(--border-accent)}
+
+  .card--claw::before{background:radial-gradient(ellipse at 30% 0%,var(--accent-claw-glow),transparent 70%)}
+  .card--claw:hover::before{opacity:1}
+  .card--gateway::before{background:radial-gradient(ellipse at 30% 0%,var(--accent-gateway-glow),transparent 70%)}
+  .card--gateway:hover::before{opacity:1}
+
+  .card .badge{
+    display:inline-block;
+    font-size:.7rem;
+    font-weight:700;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    padding:5px 14px;
+    border-radius:100px;
+    margin-bottom:20px;
+  }
+  .card--claw .badge{background:var(--accent-claw-glow);color:var(--accent-claw)}
+  .card--gateway .badge{background:var(--accent-gateway-glow);color:var(--accent-gateway)}
+
+  .card h3{
+    font-size:1.45rem;
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  .card--claw h3{color:#b8a9ff}
+  .card--gateway h3{color:#6aecd8}
+
+  .card .tagline{
+    font-size:.92rem;
+    color:var(--text-muted);
+    margin-bottom:22px;
+    font-style:italic;
+  }
+
+  .card .detail-block{margin-bottom:18px}
+  .card .detail-block .label{
+    font-size:.72rem;
+    font-weight:700;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:4px;
+  }
+  .card .detail-block p{
+    font-size:.92rem;
+    color:var(--text);
+    line-height:1.6;
+  }
+
+  .card .features{
+    list-style:none;
+    padding:0;
+    margin:0 0 18px;
+  }
+  .card .features li{
+    font-size:.88rem;
+    color:var(--text);
+    padding:5px 0;
+    padding-left:22px;
+    position:relative;
+  }
+  .card .features li::before{
+    content:'';
+    position:absolute;
+    left:0;top:11px;
+    width:8px;height:8px;
+    border-radius:50%;
+  }
+  .card--claw .features li::before{background:var(--accent-claw)}
+  .card--gateway .features li::before{background:var(--accent-gateway)}
+
+  .card .think-of-it{
+    margin-top:20px;
+    padding:16px 18px;
+    background:rgba(255,255,255,.03);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    font-size:.88rem;
+    color:var(--text);
+    line-height:1.55;
+  }
+  .card .think-of-it strong{
+    display:block;
+    font-size:.7rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:4px;
+  }
+
+  /* ── Table ── */
+  .table-wrap{
+    margin:0 auto;
+    max-width:700px;
+  }
+  table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  thead th{
+    text-align:left;
+    font-size:.72rem;
+    font-weight:700;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    padding:16px 24px;
+    background:rgba(255,255,255,.02);
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{
+    padding:14px 24px;
+    font-size:.9rem;
+    color:var(--text);
+    border-bottom:1px solid var(--border);
+  }
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-hover)}
+
+  .pill{
+    display:inline-block;
+    font-size:.72rem;
+    font-weight:700;
+    letter-spacing:.06em;
+    padding:3px 12px;
+    border-radius:100px;
+  }
+  .pill--claw{background:var(--accent-claw-glow);color:var(--accent-claw)}
+  .pill--gateway{background:var(--accent-gateway-glow);color:var(--accent-gateway)}
+
+  /* ── Footer ── */
+  footer{
+    text-align:center;
+    padding:64px 0 48px;
+  }
+  footer p{
+    font-size:.92rem;
+    color:var(--text-muted);
+  }
+  footer p strong{color:var(--text)}
+  footer .brand{
+    margin-top:24px;
+    font-size:.72rem;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+
+  /* ── Divider ── */
+  .divider{
+    width:60px;
+    height:1px;
+    background:var(--border-accent);
+    margin:48px auto;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">rawgrowth.ai</div>
+    <h1>Raw Growth AI Infrastructure</h1>
+    <p class="subtitle">Understanding our tools</p>
+  </header>
+
+  <!-- Comparison Cards -->
+  <div class="section-label"><h2>The Two Systems</h2></div>
+
+  <div class="cards">
+
+    <!-- RawClaw -->
+    <div class="card card--claw">
+      <span class="badge">Personal</span>
+      <h3>RawClaw</h3>
+      <p class="tagline">Your personal AI department on YOUR computer</p>
+
+      <div class="detail-block">
+        <div class="label">What It Is</div>
+        <p>Claude Code runs locally on your Mac, accessed via Telegram. It has full access to your files, your projects, and your machine.</p>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">How It Works</div>
+        <p>You message a Telegram bot &rarr; RawClaw runs the actual Claude Code CLI on your machine &rarr; sends the result back to your phone.</p>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Key Features</div>
+        <ul class="features">
+          <li>Full file system access</li>
+          <li>Persistent memory across sessions</li>
+          <li>Voice input and output</li>
+          <li>Scheduled tasks and automations</li>
+          <li>Multi-agent teams</li>
+          <li>Web dashboard</li>
+        </ul>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Best For</div>
+        <p>Personal AI assistant, running code, managing files, automating YOUR workflows.</p>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Access</div>
+        <p>Each person gets their own install on their own machine.</p>
+      </div>
+
+      <div class="think-of-it">
+        <strong>Think of it as</strong>
+        &ldquo;Your own AI employee that lives on your computer and you text it from your phone.&rdquo;
+      </div>
+    </div>
+
+    <!-- Claude Gateway -->
+    <div class="card card--gateway">
+      <span class="badge">Shared</span>
+      <h3>Claude Gateway</h3>
+      <p class="tagline">The team&rsquo;s shared AI brain in Discord</p>
+
+      <div class="detail-block">
+        <div class="label">What It Is</div>
+        <p>A shared AI bot in the team Discord server. Anyone in the server can talk to it and everyone can see the conversations.</p>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">How It Works</div>
+        <p>You message in Discord &rarr; Gateway routes to the Claude API &rarr; response posted in Discord for the whole team to see.</p>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Key Features</div>
+        <ul class="features">
+          <li>Multi-channel (Discord + Telegram)</li>
+          <li>Shared team context</li>
+          <li>Team-visible conversations</li>
+          <li>Sub-agent routing</li>
+        </ul>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Best For</div>
+        <p>Team collaboration, shared knowledge, quick questions everyone can see.</p>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Access</div>
+        <p>One shared bot &mdash; everyone uses the same Discord server.</p>
+      </div>
+
+      <div class="think-of-it">
+        <strong>Think of it as</strong>
+        &ldquo;The team&rsquo;s shared AI brain in Discord that everyone can talk to.&rdquo;
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Divider -->
+  <div class="divider"></div>
+
+  <!-- When To Use Which -->
+  <div class="section-label"><h2>When to Use Which</h2></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>I want to&hellip;</th>
+          <th>Use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Run code on my machine</td>
+          <td><span class="pill pill--claw">RawClaw</span></td>
+        </tr>
+        <tr>
+          <td>Ask a quick question the team can see</td>
+          <td><span class="pill pill--gateway">Gateway</span></td>
+        </tr>
+        <tr>
+          <td>Automate my personal workflow</td>
+          <td><span class="pill pill--claw">RawClaw</span></td>
+        </tr>
+        <tr>
+          <td>Get a team-wide briefing</td>
+          <td><span class="pill pill--gateway">Gateway</span></td>
+        </tr>
+        <tr>
+          <td>Access my files and projects</td>
+          <td><span class="pill pill--claw">RawClaw</span></td>
+        </tr>
+        <tr>
+          <td>Brainstorm with the team</td>
+          <td><span class="pill pill--gateway">Gateway</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="divider"></div>
+
+  <footer>
+    <p>Questions? Ask in <strong>#general</strong> on Discord.</p>
+    <div class="brand">Raw Growth</div>
+  </footer>
+
+</div>
+</body>
+</html>

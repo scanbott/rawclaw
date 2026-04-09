@@ -1,27 +1,29 @@
 ---
 name: brand-voice
-description: Load the [COMPANY_NAME] brand voice, identity framework, and [CEO_NAME]'s voice profile. Use before writing ANY content, copy, or client-facing material.
+description: Load the Rawgrowth brand voice, identity framework, and Chris West's voice profile. Use before writing ANY content, copy, or client-facing material.
 user-invocable: true
 ---
 
-# Brand Voice -- [COMPANY_NAME]
+# Brand Voice -- Rawgrowth
 
-Load these files before writing any content or copy:
+Load this file before writing any content or copy:
 
-1. **Brand Foundation v2 (PRIMARY):** Read `~/knowledge/brand/00-brand-foundation-v2.md` -- The single source of truth for positioning, offer, ICP, voice, and deliverables. This overrides any older brand docs that conflict.
-2. **Voice Profile:** Read `~/knowledge/agents/chris-voice-profile.md` -- Data-backed voice profile from 70,927 words of real transcript analysis.
-3. **Brand Identity:** Read `~/knowledge/brand/05-brand-voice.md` -- Visual identity (colors, fonts, logo) and platform-specific guidelines.
-4. **Results:** Read `~/knowledge/brand/09-results.md` -- Real proof points only.
+1. **VOICE.md (QUICK-LOAD):** Read `marketing/brand/VOICE.md` -- Consolidated voice profile with patterns, rules, scoring rubric, and real examples. This is everything you need in one read.
+
+For deep reference (only when the task requires it):
+2. **ICP Deep Dive:** Read `marketing/brand/identity/02-icp.md` -- Detailed ideal customer profile from 103 sales calls.
+3. **Copy Examples:** Browse `marketing/brand/copy-examples/` -- Real VSLs, sales pages, emails organized by type.
+4. **Brand Positioning:** Read `marketing/brand/identity/12-brand-positioning.md` -- Full positioning, offer, ICP, deliverables.
 
 ## Positioning (Non-Negotiable)
 
-[CEO_NAME] is THE guy that 7-9 figure online agencies and consultants come to when they need to productize their fulfillment and build an in-house AI department.
+Chris West is THE guy that 7-9 figure online agencies and consultants come to when they need to productize their fulfillment and build an in-house AI department.
 
 - **Value prop:** Productize fulfillment with AI. The AI department is the MECHANISM, not the headline.
 - **What they buy:** Clarity with AI.
 - **Differentiator:** Marketing, sales, and ops heavy. We understand modern marketing and scale with data.
 - **Deliverables:** Business audit + AI audit, company database, AI agents, CEO dashboard, custom company LLM, team training.
-- **Pricing:** $20K install + $10K/mo retainer. 7-day build.
+- **Pricing:** $27K setup + $10K/mo retainer. Client covers flights (~$500pp) + Mac Mini (~$600).
 - **ICP:** $3M-$15M agency owners and consultants (Gadzhi, Hormozi, Sapp types).
 
 ## How Chris Actually Talks
@@ -79,3 +81,11 @@ Before finalizing any piece of content or copy, score it against these four crit
 | Concision | Every sentence earns its spot. Cut anything that does not add signal. | /5 |
 
 **Minimum passing score:** 3/5 on every criteria. If it fails any single one, rewrite that dimension, then rescore.
+
+## Stolen Positioning Frames (Hormozi "How to Win With AI in 2026")
+
+**Phase shift metaphor** (use in pitches and content): "Everyone's been training their whole career to swim. The change coming isn't bigger waves -- it's the water boiling away. The physics of the environment change. Doesn't matter how good a swimmer you are."
+
+**The last human value**: In a world of infinite AI labor, the last thing humans get paid to do is take risk. Everything else trends toward zero cost. Position Chris as someone who took the risk early and has 2 years of proof to show for it.
+
+**AI-first from day one**: Companies that started AI-native have revenue per employee in the millions. The ones trying to retrofit AI into existing headcount are losing to startups that never had the bloat.

@@ -1,0 +1,27 @@
+Raw Claw v2 Build Progress
+===========================
+
+[2026-03-30 02:30] INIT: Created feature_list.json (10 features), architecture.md, and this progress file.
+[2026-03-30 02:30] INIT: Duplicated rawclaw/ -> rawclaw-v2/. Copied missing tsconfig.json.
+[2026-03-30 02:30] INIT: npm install in progress (--ignore-scripts to avoid puppeteer issues).
+
+[2026-03-30 02:35] F01 DONE: src/supabase.ts — Lightweight fetch-based Supabase REST client (~240 lines)
+[2026-03-30 02:40] F04 DONE: src/audit.ts — Activity audit log with 30+ action types (~200 lines)
+[2026-03-30 02:45] F02 DONE: src/budget.ts — Budget governance with multi-scope policies (~340 lines)
+[2026-03-30 02:50] F03 DONE: src/heartbeat.ts — Heartbeat execution model (~385 lines)
+[2026-03-30 02:55] F06 DONE: src/discord.ts — Discord REST adapter (~230 lines)
+[2026-03-30 03:00] F07 DONE: src/plugins.ts + src/plugin-types.ts — Plugin system (~320 lines)
+[2026-03-30 03:05] F10 DONE: src/session-compaction.ts — Session compaction tracking (~235 lines)
+[2026-03-30 03:10] F09 DONE: src/health.ts — Health check & monitoring (~310 lines)
+[2026-03-30 03:15] F05 DONE: src/dashboard.ts — 15+ new API endpoints added
+[2026-03-30 03:15] F08 DONE: scripts/setup.ts — 3 new wizard sections (Supabase, Budget, Discord)
+
+[2026-03-30 03:20] BUILD FIX: Fixed TS2345 (BudgetPolicy cast), TS2741 (AgentResult.newSessionId), TS2554 (runAgent positional args), TS2551 (cacheReadInputTokens), ESM require() -> registration pattern
+[2026-03-30 03:25] INTEGRATION: Updated db.ts with 4 new tables + 12 new query functions
+[2026-03-30 03:25] INTEGRATION: Updated index.ts with v2 module imports, registration calls, plugin loading, health monitor
+[2026-03-30 03:30] FINALIZE: Updated feature_list.json (all 10 features -> status: complete)
+[2026-03-30 03:30] FINALIZE: Updated README.md with v2 feature table
+[2026-03-30 03:30] FINALIZE: Created CHANGELOG.md, WHAT-CHANGED.md
+[2026-03-30 03:30] FINALIZE: npm run build -> 0 errors. Clean compilation.
+
+RESULT: All 10 features implemented. Build passes. Zero new runtime dependencies.

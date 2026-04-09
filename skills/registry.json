@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "description": "Rawgrowth Skills Registry -- available skills for your AI department",
+  "pre_installed": ["brand-voice", "gmail", "google-calendar", "slack", "tldr", "timezone"],
+  "skills": [
+    {
+      "name": "brand-voice",
+      "description": "Load your brand voice and write in your exact style",
+      "triggers": ["write content", "brand voice", "in our voice"],
+      "category": "content",
+      "pre_installed": true
+    },
+    {
+      "name": "gmail",
+      "description": "Manage Gmail -- read, send, triage, search",
+      "triggers": ["email", "inbox", "send email"],
+      "category": "comms",
+      "pre_installed": true
+    },
+    {
+      "name": "google-calendar",
+      "description": "Calendar management -- schedule, check availability, create events",
+      "triggers": ["schedule", "calendar", "book meeting"],
+      "category": "ops",
+      "pre_installed": true
+    },
+    {
+      "name": "slack",
+      "description": "Manage Slack -- read messages, send to channels, search",
+      "triggers": ["slack", "message team"],
+      "category": "comms",
+      "pre_installed": true
+    },
+    {
+      "name": "content-creation",
+      "description": "Content frameworks, hooks, scripts, video ideas",
+      "triggers": ["content", "hooks", "script"],
+      "category": "content",
+      "pre_installed": false
+    },
+    {
+      "name": "sales",
+      "description": "Sales playbook, DM templates, objection handling, follow-ups",
+      "triggers": ["sales", "follow up", "dm", "prospect"],
+      "category": "sales",
+      "pre_installed": false
+    },
+    {
+      "name": "research",
+      "description": "Competitive research, market analysis, prospect research",
+      "triggers": ["research", "competitor", "market"],
+      "category": "research",
+      "pre_installed": false
+    },
+    {
+      "name": "proposal",
+      "description": "Create custom client proposals with CRM lookup",
+      "triggers": ["proposal", "pitch deck"],
+      "category": "sales",
+      "pre_installed": false
+    },
+    {
+      "name": "copywriting",
+      "description": "End-to-end copy pipeline with Planner-Generator-Evaluator",
+      "triggers": ["copywriting", "write copy", "landing page"],
+      "category": "content",
+      "pre_installed": false
+    }
+  ]
+}

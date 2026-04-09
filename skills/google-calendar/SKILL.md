@@ -1,135 +1,158 @@
 ---
 name: google-calendar
-description: Create, list, update, and delete Google Calendar events. Book meetings, send invites, check availability. Triggers on "book a meeting", "schedule a call", "add to calendar", "check my calendar", "when am I free", "cancel the meeting".
-user-invocable: true
+description: Manage your Google Calendar from Claude Code. Create events with Meet links, send invites, check availability.
+allowed-tools: Bash(RAWCLAW_DIR=* ~/.venv/bin/python3 ~/.config/calendar/gcal.py *)
 ---
 
-# Google Calendar
+# Google Calendar Skill
 
-**Flow:** Parse request -> Check auth -> Execute calendar action -> Confirm result
+## Purpose
 
-No pauses. Run end to end once triggered.
+Create meetings with Google Meet links, send invites, check availability, and manage calendar events from Claude Code.
 
-**Script:** `~/.claude/skills/google-calendar/scripts/gcal.py`
-**Default calendar:** chris@[COMPANY_DOMAIN]
-**Token:** ~/.config/gws/calendar_token.json
-**Client secret:** ~/.config/gws/client_secret.json
+## Environment
 
-Parse the user's message for:
-- **action** (required) -- create, list, update, delete, or freebusy
-- **title** (for create/update) -- event name
-- **datetime** (for create/update) -- when (natural language ok, script parses it)
-- **duration** (optional) -- in minutes, defaults to 60
-- **attendees** (optional) -- comma-separated emails
-- **description** (optional) -- event details
-- **location** (optional) -- physical or virtual location
-- **event_id** (for update/delete) -- Google Calendar event ID
+The calendar CLI reads credential paths from environment variables, loaded from RawClaw's `.env` via `RAWCLAW_DIR`. Every command MUST use this prefix:
 
----
-
-## Step 0: Check Auth
-
-```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py list --days 1
+```
+RAWCLAW_DIR=/path/to/rawclaw
 ```
 
-If output contains "ERROR: No valid credentials", run auth flow:
+Your `.env` should contain:
 
-```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py auth
+```
+GOOGLE_CREDS_PATH=~/.config/gmail/credentials.json
+GCAL_TOKEN_PATH=~/.config/calendar/token.json
 ```
 
-This opens a browser for Google OAuth. Tell user to sign in with chris@[COMPANY_DOMAIN] and authorize. Token saves automatically. Then retry the original action.
+If these aren't set, the script falls back to `~/.config/gmail/credentials.json` (shared with Gmail) and `~/.config/calendar/token.json`.
 
----
+## Commands
 
-## Step 1: Create Event
-
-When user wants to book, schedule, or add a meeting/call/event:
+### List upcoming events
 
 ```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py create \
-  --title "EVENT TITLE" \
-  --start "YYYY-MM-DD HH:MM PM" \
-  --duration MINUTES \
-  --attendees "email1@domain.com,email2@domain.com" \
-  --description "Event details here" \
-  --location "Zoom / address / etc"
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py list
 ```
 
-- `--duration` defaults to 60 if not specified
-- `--attendees` triggers automatic invite emails to all listed
-- Add `--meet` flag to auto-generate a Google Meet link
-- Times without timezone assume Pacific (America/Los_Angeles)
+Returns next 10 events as JSON. Each entry has: `id`, `summary`, `start`, `end`, `attendees`, `meet_link`.
 
-Report back: event title, date/time, attendees invited, calendar link.
-
----
-
-## Step 2: List Events
-
-When user asks what's on their calendar, upcoming meetings, schedule:
+### List events within N days
 
 ```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py list --days N
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py list --days 7
 ```
 
-Default: 7 days. Format results cleanly. Include event IDs (needed for update/delete).
-
----
-
-## Step 3: Update Event
-
-When user wants to reschedule, change attendees, update details:
+### Get event details
 
 ```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py update \
-  --event-id "EVENT_ID" \
-  --title "New title" \
-  --start "New datetime" \
-  --attendees "updated@emails.com"
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py get <event_id>
 ```
 
-Only pass the flags that need changing. Attendees get notified of changes.
-
-If user doesn't provide event_id, list events first to find it.
-
----
-
-## Step 4: Delete Event
-
-When user wants to cancel a meeting:
+### Create event with Meet link and invites
 
 ```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py delete --event-id "EVENT_ID"
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py create "Meeting Title" "2026-03-15 10:00" --duration 30 --attendees "person@example.com,other@example.com" --meet
 ```
 
-Attendees get cancellation notice automatically.
+- `--duration` in minutes (default: 30)
+- `--attendees` comma-separated emails (sends invite emails automatically)
+- `--meet` adds a Google Meet video link
+- `--description` adds event description
+- `--location` adds location
 
-If user doesn't provide event_id, list events first to find it.
-
----
-
-## Step 5: Check Availability
-
-When user asks "am I free", "when am I available", "any conflicts":
+### Update an event
 
 ```bash
-python3 ~/.claude/skills/google-calendar/scripts/gcal.py freebusy \
-  --start "YYYY-MM-DD HH:MM" \
-  --end "YYYY-MM-DD HH:MM"
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py update <event_id> --title "New Title" --start "2026-03-16 14:00" --duration 60 --add-attendees "new@example.com" --meet
 ```
 
-Report back: available or busy with conflict times.
+All flags are optional. Only provided fields are updated. Attendees are notified of changes.
 
----
+### Cancel an event
+
+```bash
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py cancel <event_id>
+```
+
+Cancels the event and sends cancellation notices to all attendees.
+
+### Check free/busy
+
+```bash
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py freebusy "2026-03-15 09:00" "2026-03-15 17:00"
+```
+
+Shows busy time slots in the given range. If no conflicts, says "Time range is free."
+
+### Re-authenticate
+
+```bash
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py auth
+```
+
+## CRITICAL: Day-of-Week Verification
+
+**NEVER assume a date from a day name** (e.g. "Monday", "next Thursday"). Always verify before creating an event:
+
+```bash
+python3 -c "from datetime import date; d = date(2026, 3, 15); print(f'{d.strftime(\"%A\")} {d}')"
+```
+
+- If the output day name does NOT match what was requested, find the correct date
+- This is a **blocking requirement**. Getting the day wrong sends a wrong invite to a real person.
+
+## Workflow
+
+1. If the user doesn't specify a time, check the calendar first with `list --days 7`
+2. **If a day name was mentioned, verify the date matches that day**
+3. Check `freebusy` for the proposed slot
+4. Create the event with `--meet` and `--attendees`
+5. Confirm: show title, time, **day of week**, attendees, and Meet link
+
+## Confirmation Before Creating
+
+Always show the user what you're about to create before running the command:
+- Title
+- **Day of week + Date/time** (e.g. "Monday Mar 15, 12:00pm")
+- Duration
+- Attendees
+- Meet: yes/no
+
+Then ask for confirmation before executing.
+
+## Datetime Formats
+
+All of these work:
+- `2026-03-15 10:00`
+- `2026-03-15 2:00PM`
+- `2026-03-15T14:00`
+- `03/15/2026 10:00`
+
+## Timezone
+
+The script defaults to **America/New_York**. To change it, edit the `TIMEZONE` constant in `gcal.py`.
+
+## Defaults
+
+- Duration: 30 minutes (unless the user specifies otherwise)
+- Always add `--meet` unless the user specifically says no video call
+- Invites are sent to all attendees automatically
+
+## One-Time Setup
+
+Uses the same Google Cloud project as Gmail. If `token.json` is missing:
+
+```bash
+RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/calendar/gcal.py auth
+```
+
+Browser opens, sign in, approve Calendar access, done.
+
+If you haven't set up Gmail yet, you'll need `credentials.json` first. See the Gmail skill setup instructions.
 
 ## Error Handling
 
-| Problem | Solution |
-|---------|----------|
-| No valid credentials | Run `gcal.py auth` and have user sign in |
-| Token expired | Script auto-refreshes. If it fails, re-run auth |
-| Event not found | List events to find correct event_id |
-| Permission denied | Verify calendar ID is correct (default: chris@[COMPANY_DOMAIN]) |
-| python-dateutil missing | `pip3 install --break-system-packages python-dateutil pytz` |
+- If `credentials.json` missing, point to Gmail setup (same file)
+- If `token.json` missing, run auth automatically
+- If event creation fails, show error and ask the user what to do

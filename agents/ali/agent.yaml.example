@@ -1,0 +1,6 @@
+name: Ali
+description: Engineering -- code, APIs, automations, deploys, integrations, debugging
+
+telegram_bot_token_env: ALI_BOT_TOKEN
+
+model: claude-sonnet-4-5

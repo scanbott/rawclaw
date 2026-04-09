@@ -1,0 +1,6 @@
+name: Quilly
+description: Content -- scripts, posts, hooks, brand voice, video ideas, social calendar
+
+telegram_bot_token_env: QUILLY_BOT_TOKEN
+
+model: claude-sonnet-4-5

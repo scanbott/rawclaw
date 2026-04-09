@@ -1,0 +1,6 @@
+name: Larry
+description: Sales -- CRM, DMs, proposals, sequences, objection handling, follow-ups
+
+telegram_bot_token_env: LARRY_BOT_TOKEN
+
+model: claude-sonnet-4-5

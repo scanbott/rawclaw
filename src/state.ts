@@ -33,7 +33,7 @@ export interface ChatEvent {
   chatId: string;
   agentId?: string;
   content?: string;
-  source?: 'telegram' | 'dashboard' | 'slack';
+  source?: 'telegram' | 'dashboard';
   description?: string;
   processing?: boolean;
   timestamp: number;

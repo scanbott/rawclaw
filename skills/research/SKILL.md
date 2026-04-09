@@ -4,13 +4,27 @@ description: Load research methodology, competitor analysis frameworks, and the 
 user-invocable: true
 ---
 
-# Research — [COMPANY_NAME]
+# Research -- Rawgrowth
 
-## Methodology
-Read `knowledge/frameworks/competitor-analysis.md` for the full analysis framework.
+## Step 0: Query the Knowledge Graph First
+Before starting any web search or external research, query the shared knowledge graph:
+```
+query("what do we already know about [topic]?", mode="hybrid")
+```
+Use the `raganything` MCP tool. If the answer exists in the graph, skip the external search or use it to sharpen the query. Avoids redundant work and surfaces cross-agent connections.
+
+## Step N (Final): Ingest Findings into Knowledge Graph
+After completing research, always ingest the summary:
+```
+ingest_text("[full research summary]", metadata={"agent": "ovi", "date": "YYYY-MM-DD", "topic": "...", "task_type": "research"})
+```
+Every research output becomes queryable by all agents going forward.
+
+## Workspace
+Read `marketing/research/CONTEXT.md` for the workspace map and load order.
 
 ## Client Research Template
-Read `knowledge/templates/client-research-template.md` for the comprehensive research report structure covering:
+Covers:
 - Instagram analysis (30 posts)
 - YouTube analysis (20 videos)
 - Twitter analysis (50 tweets)
@@ -21,15 +35,15 @@ Read `knowledge/templates/client-research-template.md` for the comprehensive res
 - Recommendations
 
 ## Competitor Scraping
-- `knowledge/ops/competitor-scraping-sop.md` — YouTube Data API v3 scraping process
-- Python tools available: `tools/content/analyze_competitors.py`, `tools/content/analyze_titles.py`
+- Python tools: `scripts/content-db/populate_transcripts.py`, `scripts/content-db/analyze_competitors.py`
+- yt-dlp for Instagram/YouTube reel metadata
 
 ## Research Output Standards
-1. Structured data (tables, ranked lists, scored frameworks)
+1. Lead with conclusion, then evidence
 2. Sources cited for every claim
-3. Gaps flagged explicitly
-4. Actionable recommendations (not just observations)
-5. Written to Supabase when operational
+3. Confidence level flagged: high/medium/low
+4. Tables for comparisons, chronological lists for timelines
+5. Actionable recommendations -- not just data dumps
 
 ## ICP Reference
-Read `knowledge/brand/02-icp.md` to ensure research targets the right audience.
+Read `marketing/brand/identity/02-icp.md` to ensure research targets the right audience.

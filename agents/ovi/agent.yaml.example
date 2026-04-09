@@ -1,0 +1,6 @@
+name: Ovi
+description: Research -- competitive intel, market signals, lead research, data analysis
+
+telegram_bot_token_env: OVI_BOT_TOKEN
+
+model: claude-sonnet-4-5

@@ -1,0 +1,6 @@
+name: Cleo
+description: Client & Ops -- onboarding, client health, delivery, SOPs, scheduling
+
+telegram_bot_token_env: CLEO_BOT_TOKEN
+
+model: claude-sonnet-4-5

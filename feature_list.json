@@ -1,0 +1,92 @@
+[
+  {
+    "id": "F01",
+    "name": "Supabase Client Integration",
+    "description": "Add lightweight Supabase REST client (no SDK dependency) with company-scoped data access. Provides typed wrappers for heartbeat_runs, memories, budget_policies, budget_incidents, activity_log, hive_mind tables. Supports both local SQLite (existing) and remote Supabase (new) as dual-write targets.",
+    "dependencies": [],
+    "priority": "P0",
+    "status": "complete",
+    "files": ["src/supabase.ts"]
+  },
+  {
+    "id": "F02",
+    "name": "Budget Governance System",
+    "description": "Per-agent budget policies with configurable windows (daily/monthly/lifetime). Warning thresholds (default 80%), hard-stop enforcement (auto-pause agent), incident logging. Checks budget before each agent run. Integrates with existing token_usage tracking in db.ts.",
+    "dependencies": ["F01"],
+    "priority": "P0",
+    "status": "complete",
+    "files": ["src/budget.ts"]
+  },
+  {
+    "id": "F03",
+    "name": "Heartbeat Execution Model",
+    "description": "Track every agent execution as a heartbeat_run record: invocation source, status lifecycle (queued/running/completed/failed), tokens used, cost, duration, exit code, session state before/after. Wraps existing runAgent() to create/update heartbeat records. Enables dead agent detection.",
+    "dependencies": ["F01"],
+    "priority": "P0",
+    "status": "complete",
+    "files": ["src/heartbeat.ts"]
+  },
+  {
+    "id": "F04",
+    "name": "Activity Audit Log",
+    "description": "Immutable audit trail for all agent mutations. Every significant action writes to activity_log: actor (user/agent), action_type, entity_type, entity_id, detail JSONB, timestamp. Extends existing audit_log in db.ts with richer structure. Dashboard-queryable.",
+    "dependencies": [],
+    "priority": "P0",
+    "status": "complete",
+    "files": ["src/audit.ts"]
+  },
+  {
+    "id": "F05",
+    "name": "Enhanced Web Dashboard",
+    "description": "Major upgrade to dashboard.ts API layer. New endpoints: heartbeat runs/stats, budget policies/incidents/pause/resume, activity feed, session health, plugin status, Discord/Supabase status. Health endpoint at /health.",
+    "dependencies": ["F02", "F03", "F04"],
+    "priority": "P0",
+    "status": "complete",
+    "files": ["src/dashboard.ts"]
+  },
+  {
+    "id": "F06",
+    "name": "Discord Adapter",
+    "description": "REST API-based Discord adapter (no discord.js dependency) for sending/receiving messages. Supports: channel listing, message reading, message sending, webhook posting, rich embed posting. Alert helpers for health, budget, and task notifications.",
+    "dependencies": [],
+    "priority": "P1",
+    "status": "complete",
+    "files": ["src/discord.ts"]
+  },
+  {
+    "id": "F07",
+    "name": "Plugin System",
+    "description": "Lightweight plugin architecture. Plugin manifest (plugin.yaml/json) declares: id, name, version, capabilities, tools, event subscriptions. Plugin loader discovers plugins in plugins/ directory. Plugins can: register tools for agent execution, subscribe to events, provide dashboard widgets. In-process TypeScript modules with YAML manifests.",
+    "dependencies": [],
+    "priority": "P1",
+    "status": "complete",
+    "files": ["src/plugins.ts", "src/plugin-types.ts"]
+  },
+  {
+    "id": "F08",
+    "name": "Enhanced Setup Wizard",
+    "description": "Extended setup wizard with new sections for Supabase cloud sync, budget governance defaults, and Discord notification configuration. Tests Supabase connection, validates webhook URLs.",
+    "dependencies": ["F01"],
+    "priority": "P1",
+    "status": "complete",
+    "files": ["scripts/setup.ts"]
+  },
+  {
+    "id": "F09",
+    "name": "Health Check & Monitoring",
+    "description": "GET /health endpoint returning JSON status of all subsystems: database, Telegram bot, Supabase connection, memory system, scheduler. Periodic self-check (5-min interval) with status change logging. Registration pattern for DB access.",
+    "dependencies": ["F01"],
+    "priority": "P1",
+    "status": "complete",
+    "files": ["src/health.ts"]
+  },
+  {
+    "id": "F10",
+    "name": "Memory System Upgrade",
+    "description": "Session compaction tracking (max 200 runs / 2M tokens / 72h thresholds from Paperclip). Per-agent session state with rotation and audit logging. Registration pattern for DB session clearing.",
+    "dependencies": ["F01"],
+    "priority": "P1",
+    "status": "complete",
+    "files": ["src/session-compaction.ts"]
+  }
+]

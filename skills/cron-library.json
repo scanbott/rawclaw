@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "description": "Ready-to-deploy scheduled task templates",
+  "templates": [
+    {
+      "name": "Daily Morning Briefing",
+      "description": "Check calendar and email, give me today's priorities",
+      "prompt": "Check my calendar and email inbox. Give me: today's priorities, any urgent emails, meetings coming up, and one thing I should focus on first.",
+      "cron": "0 8 * * 1-5",
+      "agent": "scan",
+      "category": "ops"
+    },
+    {
+      "name": "Weekly Strategy Review",
+      "description": "Summarize the week and set priorities for next week",
+      "prompt": "Summarize this week: wins, decisions made, what's still open. Then set the top 3 priorities for next week.",
+      "cron": "0 16 * * 5",
+      "agent": "scan",
+      "category": "ops"
+    },
+    {
+      "name": "Weekly Content Calendar",
+      "description": "Plan this week's content based on current campaigns",
+      "prompt": "Plan this week's content calendar. Check what we've posted recently, what's performing, and create a 5-day posting schedule with ideas for each day.",
+      "cron": "0 9 * * 1",
+      "agent": "quilly",
+      "category": "content"
+    },
+    {
+      "name": "Daily Sales Pipeline Review",
+      "description": "Check pipeline status, flag stale deals, prep follow-ups",
+      "prompt": "Review the sales pipeline. Flag any deals that haven't moved in 5+ days. Draft follow-up messages for the top 3 stale deals.",
+      "cron": "0 9 * * 2,4",
+      "agent": "larry",
+      "category": "sales"
+    },
+    {
+      "name": "Monthly Client Health Report",
+      "description": "Generate monthly health report for all active clients",
+      "prompt": "Generate the monthly client health report. For each active client: wins this month, any concerns, recommended actions for next month.",
+      "cron": "0 9 1 * *",
+      "agent": "cleo",
+      "category": "ops"
+    },
+    {
+      "name": "Weekly Competitor Scan",
+      "description": "Monitor competitor moves and market signals",
+      "prompt": "Run a competitor scan. Check what our top 3 competitors have posted, launched, or changed this week. Summarize key signals.",
+      "cron": "0 10 * * 1",
+      "agent": "ovi",
+      "category": "research"
+    }
+  ]
+}

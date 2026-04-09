@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install BusinessOS launchd agents for auto-start on login + auto-restart on crash
+# Install RawClaw launchd agents for auto-start on login + auto-restart on crash
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,16 +8,16 @@ LAUNCHD_DIR="$PROJECT_DIR/launchd"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 LOG_DIR="$PROJECT_DIR/logs"
 
-echo "BusinessOS launchd installer"
+echo "RawClaw launchd installer"
 echo "============================"
 echo ""
 
 # Ensure logs directory exists
 mkdir -p "$LOG_DIR"
 
-# Clean up stale/orphaned businessos agents not in the current launchd/ directory
+# Clean up stale/orphaned rawclaw agents not in the current launchd/ directory
 echo "Cleaning up stale agents..."
-for existing in "$LAUNCH_AGENTS_DIR"/com.[COMPANY_DOMAIN_REVERSED].*.plist; do
+for existing in "$LAUNCH_AGENTS_DIR"/com.rawclaw.*.plist; do
   [ -f "$existing" ] || continue
   label=$(basename "$existing" .plist)
   # Check if this plist has a corresponding file in our launchd/ dir
@@ -27,11 +27,11 @@ for existing in "$LAUNCH_AGENTS_DIR"/com.[COMPANY_DOMAIN_REVERSED].*.plist; do
     rm -f "$existing"
   fi
 done
-# Also remove the bare com.[COMPANY_DOMAIN_REVERSED].plist (legacy, pre-multi-agent)
-if [ -f "$LAUNCH_AGENTS_DIR/com.[COMPANY_DOMAIN_REVERSED].plist" ]; then
-  echo "  Removing legacy agent: com.businessos"
-  launchctl unload "$LAUNCH_AGENTS_DIR/com.[COMPANY_DOMAIN_REVERSED].plist" 2>/dev/null || true
-  rm -f "$LAUNCH_AGENTS_DIR/com.[COMPANY_DOMAIN_REVERSED].plist"
+# Also remove the bare com.rawclaw.plist (legacy, pre-multi-agent)
+if [ -f "$LAUNCH_AGENTS_DIR/com.rawclaw.plist" ]; then
+  echo "  Removing legacy agent: com.rawclaw"
+  launchctl unload "$LAUNCH_AGENTS_DIR/com.rawclaw.plist" 2>/dev/null || true
+  rm -f "$LAUNCH_AGENTS_DIR/com.rawclaw.plist"
 fi
 echo ""
 
@@ -43,7 +43,7 @@ echo "Build complete."
 echo ""
 
 # Install each plist
-for plist in "$LAUNCHD_DIR"/com.[COMPANY_DOMAIN_REVERSED].*.plist; do
+for plist in "$LAUNCHD_DIR"/com.rawclaw.*.plist; do
   label=$(basename "$plist" .plist)
   dest="$LAUNCH_AGENTS_DIR/$label.plist"
 
@@ -99,7 +99,7 @@ echo "Verifying..."
 sleep 2
 
 all_ok=true
-for plist in "$LAUNCHD_DIR"/com.[COMPANY_DOMAIN_REVERSED].*.plist; do
+for plist in "$LAUNCHD_DIR"/com.rawclaw.*.plist; do
   label=$(basename "$plist" .plist)
   if launchctl list "$label" &>/dev/null; then
     pid=$(launchctl list "$label" | grep PID | awk '{print $NF}' 2>/dev/null || echo "?")
@@ -123,7 +123,7 @@ if $all_ok; then
   echo "Logs: $LOG_DIR/"
   echo ""
   echo "Useful commands:"
-  echo "  launchctl list | grep businessos    # check status"
+  echo "  launchctl list | grep rawclaw    # check status"
   echo "  tail -f $LOG_DIR/main.log           # follow main bot logs"
   echo "  $SCRIPT_DIR/uninstall-launchd.sh    # remove all agents"
 else

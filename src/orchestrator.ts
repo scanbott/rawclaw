@@ -7,7 +7,7 @@ import { loadAgentConfig, listAgentIds, resolveAgentClaudeMd } from './agent-con
 import { PROJECT_ROOT } from './config.js';
 import { logToHiveMind, createInterAgentTask, completeInterAgentTask } from './db.js';
 import { logger } from './logger.js';
-import { buildMemoryContext } from './memory/index.js';
+import { buildMemoryContext } from './memory.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -31,6 +31,7 @@ export interface AgentInfo {
 let agentRegistry: AgentInfo[] = [];
 
 /** Default timeout for a delegated task (5 minutes). */
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * Initialize the orchestrator by scanning `agents/` for valid configs.
@@ -122,6 +123,7 @@ export function parseDelegation(
  * @param chatId     Telegram chat ID (for DB tracking)
  * @param fromAgent  The requesting agent's ID (usually 'main')
  * @param onProgress Optional callback for status updates
+ * @param timeoutMs  Maximum execution time (default 5 min)
  */
 export async function delegateToAgent(
   agentId: string,
@@ -129,6 +131,7 @@ export async function delegateToAgent(
   chatId: string,
   fromAgent: string,
   onProgress?: (msg: string) => void,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<DelegationResult> {
   const agent = agentRegistry.find((a) => a.id === agentId);
   if (!agent) {
@@ -178,7 +181,9 @@ export async function delegateToAgent(
     contextParts.push(prompt);
     const fullPrompt = contextParts.join('\n\n');
 
+    // Create an AbortController with timeout
     const abortCtrl = new AbortController();
+    const timer = setTimeout(() => abortCtrl.abort(), timeoutMs);
 
     try {
       const result = await runAgent(
@@ -190,6 +195,7 @@ export async function delegateToAgent(
         abortCtrl,
       );
 
+      clearTimeout(timer);
 
       const durationMs = Date.now() - start;
       completeInterAgentTask(taskId, 'completed', result.text);
@@ -212,6 +218,7 @@ export async function delegateToAgent(
         durationMs,
       };
     } catch (innerErr) {
+      clearTimeout(timer);
       throw innerErr;
     }
   } catch (err) {
