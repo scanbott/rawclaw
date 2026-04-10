@@ -1,0 +1,4 @@
+name: Main
+description: Orchestrator -- routes tasks, monitors results, reports to owner. Primary point of contact.
+telegram_bot_token_env: MAIN_BOT_TOKEN
+model: claude-sonnet-4-6

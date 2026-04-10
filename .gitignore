@@ -45,3 +45,12 @@ knowledge/
 .next/
 .turbo/
 .vercel/
+
+# Allow template/example files that are part of the repo
+!agents/*/CLAUDE.md.example
+!knowledge/frameworks/
+!knowledge/_template/
+!knowledge/client/*.example.md
+!clients/_template/
+!workspace/artifacts/.gitkeep
+!workspace/tmp/.gitkeep

@@ -1,14 +1,11 @@
 name: Comms
-description: All human communication -- email, Slack, WhatsApp, YouTube comments, community forums, LinkedIn DMs
-
+description: Email, Slack, WhatsApp, DM management. Triage, draft, and send with approval.
 telegram_bot_token_env: COMMS_BOT_TOKEN
-
 model: claude-sonnet-4-6
-
 obsidian:
   vault: /path/to/your/obsidian/vault
   folders:
-    - Projects/
     - Inbox/
+    - Projects/
   read_only:
     - Daily Notes/

@@ -748,10 +748,15 @@ async function main() {
   if (wantAgents) {
     console.log();
     info('Available templates:');
-    console.log(`  1. ${c.bold}comms${c.reset}     — email, Slack, WhatsApp, YouTube comments, community forums, LinkedIn`);
-    console.log(`  2. ${c.bold}content${c.reset}   — YouTube scripts, LinkedIn posts, trend research`);
-    console.log(`  3. ${c.bold}ops${c.reset}       — calendar, billing, Stripe, Gumroad, admin`);
-    console.log(`  4. ${c.bold}research${c.reset}  — deep web research, academic, competitive intel`);
+    console.log(`  1. ${c.bold}main${c.reset}      — orchestrator, routes work, reports to you`);
+    console.log(`  2. ${c.bold}dev${c.reset}       — code, APIs, deployments, MCP servers`);
+    console.log(`  3. ${c.bold}ops${c.reset}       — client success, onboarding, delivery tracking`);
+    console.log(`  4. ${c.bold}finance${c.reset}   — budget, costs, revenue monitoring`);
+    console.log(`  5. ${c.bold}sales${c.reset}     — copy, DMs, proposals, CRM`);
+    console.log(`  6. ${c.bold}content${c.reset}   — YouTube scripts, posts, reels, content calendar`);
+    console.log(`  7. ${c.bold}research${c.reset}  — web research, competitor intel, market analysis`);
+    console.log(`  8. ${c.bold}comms${c.reset}     — email, Slack, WhatsApp inbox management`);
+    console.log(`  9. ${c.bold}support${c.reset}   — customer support, FAQ, ticket triage`);
     console.log();
     info('For each agent, you\'ll need to create a Telegram bot via @BotFather.');
     info('Open Telegram → @BotFather → /newbot → choose a name and username.');
@@ -763,14 +768,138 @@ async function main() {
     info('It walks you through template selection, bot creation, and configuration.');
     info('Then start each agent in its own terminal:');
     console.log();
-    console.log(`  ${c.cyan}npm start -- --agent comms${c.reset}      # Terminal 2`);
-    console.log(`  ${c.cyan}npm start -- --agent content${c.reset}    # Terminal 3`);
-    console.log(`  ${c.cyan}npm start -- --agent ops${c.reset}        # Terminal 4`);
+    console.log(`  ${c.cyan}npm start -- --agent main${c.reset}      # Terminal 2`);
+    console.log(`  ${c.cyan}npm start -- --agent sales${c.reset}     # Terminal 3`);
+    console.log(`  ${c.cyan}npm start -- --agent content${c.reset}   # Terminal 4`);
     console.log();
     info('Or install as background services:');
     console.log(`  ${c.cyan}bash scripts/agent-service.sh install comms${c.reset}`);
     console.log();
     info('Full guide: see "Creating a team of agents" in the README.');
+  }
+
+  // ── 15b. Business knowledge intake ──────────────────────────────────────────
+  section('Load your business context');
+
+  info('RawClaw agents work better when they know your business.');
+  info('Answer these questions and every agent will be pre-loaded with your context.');
+  console.log();
+
+  const wantBusinessIntake = await confirm('Set up your business knowledge base now?', true);
+  if (wantBusinessIntake) {
+    console.log();
+
+    // Business basics
+    const companyName = await ask('Company name');
+    const website = await ask('Website URL', 'https://');
+    const whatYouSell = await ask('What do you sell? (one sentence)');
+    const icp = await ask('Who is your ideal client? (be specific -- industry, revenue, characteristics)');
+    const transformation = await ask('What transformation do you deliver? (before → after)');
+    const offerName = await ask('Main offer name');
+    const offerPrice = await ask('Investment / price range');
+    const guarantee = await ask('Guarantee (or "none")');
+
+    // Brand voice
+    console.log();
+    info('Brand voice -- how your agents will communicate:');
+    const toneDesc = await ask('Describe your tone (e.g., "direct and confident, no-BS" or "warm and educational")');
+    const wordsToAvoid = await ask('Words or phrases to NEVER use (comma-separated, or press enter to skip)', '');
+    const bannedPhrases = wordsToAvoid ? wordsToAvoid.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    // Competitors
+    console.log();
+    info('Competitors (optional -- agents will build profiles for these):');
+    const competitorInput = await ask('Top 3 competitor names or URLs (comma-separated, or press enter to skip)', '');
+    const competitors = competitorInput ? competitorInput.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    // Write knowledge files
+    const knowledgeDir = path.join(PROJECT_ROOT, 'knowledge', 'client');
+    fs.mkdirSync(knowledgeDir, { recursive: true });
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // business.md
+    const businessMd = `---
+generated: ${today}
+owner: ops
+status: active
+---
+
+# Business Context
+
+## What We Sell
+
+**Company:** ${companyName}
+**Website:** ${website}
+**One-line description:** ${whatYouSell}
+
+## The Transformation
+
+${transformation}
+
+## Ideal Client Profile (ICP)
+
+${icp}
+
+## Offer Stack
+
+**Main offer:** ${offerName}
+**Price:** ${offerPrice}
+**Guarantee:** ${guarantee}
+`;
+    fs.writeFileSync(path.join(knowledgeDir, 'business.md'), businessMd, 'utf-8');
+    ok('Created knowledge/client/business.md');
+
+    // brand-voice.md
+    const brandVoiceMd = `---
+generated: ${today}
+owner: ops
+status: active
+---
+
+# Brand Voice
+
+## Tone
+
+${toneDesc}
+
+## Words We Never Use
+
+${bannedPhrases.length > 0 ? bannedPhrases.map(p => `- ${p}`).join('\n') : '- (none specified)'}
+- Generic AI phrases: "game-changing", "revolutionary", "synergy"
+- Filler openers: "I hope this finds you well", "I wanted to reach out"
+- Em dashes (-- or —)
+
+## Writing Style
+
+- Short sentences. Active voice.
+- Lead with the reader's world, not yours.
+- Specific beats vague -- numbers and names over adjectives.
+- Contractions always.
+`;
+    fs.writeFileSync(path.join(knowledgeDir, 'brand-voice.md'), brandVoiceMd, 'utf-8');
+    ok('Created knowledge/client/brand-voice.md');
+
+    // Competitors placeholder
+    if (competitors.length > 0) {
+      const competitorDir = path.join(PROJECT_ROOT, 'knowledge', 'competitors');
+      fs.mkdirSync(competitorDir, { recursive: true });
+      for (const comp of competitors) {
+        const slug = comp.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const compFile = path.join(competitorDir, `${slug}.md`);
+        if (!fs.existsSync(compFile)) {
+          fs.writeFileSync(compFile, `# Competitor: ${comp}\nLast updated: ${today}\n\n> Run the competitor-intel skill to populate this file.\n> "Research [${comp}] using the competitor-intel skill"\n`, 'utf-8');
+        }
+      }
+      ok(`Created ${competitors.length} competitor placeholder(s) in knowledge/competitors/`);
+      console.log();
+      info(`To build full competitor profiles, ask your research agent:`);
+      info(`"Analyze [competitor name] using the competitor-intel skill"`);
+    }
+
+    console.log();
+    info('Knowledge base created. Agents will load these files automatically.');
+    info('Edit them anytime at knowledge/client/ to keep them current.');
   }
 
   // ── 16. Supabase (v2 feature) ─────────────────────────────────────────────

@@ -113,7 +113,7 @@ node "$PROJECT_ROOT/dist/mission-cli.js" result <task-id>         # get a task's
 node "$PROJECT_ROOT/dist/mission-cli.js" cancel <task-id>         # cancel a queued task
 ```
 
-Available agents: main, research, comms, content, ops. Use `--priority 10` for high priority, `--priority 0` for low (default is 5).
+Available agents: main, dev, ops, finance, sales, content, research, comms, support. Use `--priority 10` for high priority, `--priority 0` for low (default is 5).
 
 ## Creating New Agents
 
@@ -260,3 +260,113 @@ print('Checkpoint saved.')
 "
 ```
 5. Confirm: "Checkpoint saved. Safe to /newchat."
+
+---
+
+## Hive Mind
+
+After completing any meaningful action, log it so other agents have awareness:
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+sqlite3 "$PROJECT_ROOT/store/rawclaw.db" "INSERT INTO hive_mind (agent_id, chat_id, action, summary, artifacts, created_at) VALUES ('[YOUR_AGENT_ID]', '[CHAT_ID]', '[ACTION_TYPE]', '[1-line summary of what was done]', NULL, strftime('%s','now'));"
+```
+
+This is how agents stay aware of each other. It feeds the team activity section in every agent's memory context. Don't skip it.
+
+---
+
+## Decision Framework
+
+When a problem has multiple valid approaches, use this:
+1. Generate 3 solutions (don't anchor on the first idea)
+2. Pick the one you'd actually recommend
+3. Present all 3 to [YOUR NAME] with trade-offs (1-2 sentences each)
+4. [YOUR NAME] confirms
+5. Log the decision to hive mind
+
+Don't skip step 3 even if you're confident. It gives them the information to push back if your recommendation is wrong.
+
+---
+
+## Planner-Generator-Evaluator
+
+For complex deliverables (copy, proposals, strategies, significant code changes):
+
+1. **Planner:** Spec the output before building it. Audience, goal, constraints, format, success criteria.
+2. **Generator:** Build against the spec.
+3. **Evaluator:** Score 1-10 against the spec criteria. List what works and what doesn't. If < 8, identify the weakest element and fix it.
+4. Repeat until score >= 8, then deliver.
+
+Never let the generator self-approve. The evaluator role is separate -- actively find flaws.
+
+---
+
+## Agent Routing
+
+When [YOUR NAME] asks for something that another agent handles better, delegate:
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+node "$PROJECT_ROOT/dist/mission-cli.js" create --agent [TARGET] --title "Label" "Full task description. Context: [why this matters]. Definition of done: (1) [criterion] (2) [criterion] (3) [criterion]"
+```
+
+| Task Type | Route To |
+|-----------|----------|
+| Code, APIs, deployments, MCP | dev |
+| Client success, onboarding, delivery | ops |
+| Budget, costs, revenue tracking | finance |
+| Copy, DMs, proposals, CRM | sales |
+| Scripts, posts, reels, YouTube | content |
+| Web research, competitor intel | research |
+| Email, Slack, WhatsApp inboxes | comms |
+| Customer support, tickets | support |
+
+---
+
+## File Placement
+
+| Output Type | Where It Goes |
+|-------------|---------------|
+| Finished copy / scripts | `workspace/artifacts/copy/` |
+| Research reports | `workspace/artifacts/research/` |
+| Strategy docs | `workspace/artifacts/strategy/` |
+| Client records | `clients/[name]/` |
+| Competitor profiles | `knowledge/competitors/[name].md` |
+| Temp / scratch | `workspace/tmp/` only |
+
+Nothing goes at the project root. Nothing in `src/`.
+
+---
+
+## Knowledge Files
+
+Before writing any client-facing copy or content, load:
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+cat "$PROJECT_ROOT/knowledge/client/business.md"
+cat "$PROJECT_ROOT/knowledge/client/brand-voice.md"
+cat "$PROJECT_ROOT/knowledge/client/offer.md"
+```
+
+The brand voice file overrides your defaults. Always. If it says no em dashes, no em dashes. If it says short sentences, short sentences.
+
+Before researching competitors, check if we already have a profile:
+```bash
+ls "$PROJECT_ROOT/knowledge/competitors/"
+```
+
+---
+
+## Ship Check Gate
+
+Before marking ANYTHING complete, run ship check. Load the `ship-check` skill.
+
+The short version:
+- Code: test on the live URL, not local. Every route, every button.
+- Copy: read it aloud. Score it 1-10. Below 8 means rewrite.
+- Research: spot-check 3 data points. Every claim has a source.
+- Data tasks: spot-check 3 rows. Count matches expectations.
+
+If it doesn't pass ship check, it's not done.

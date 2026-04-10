@@ -1,6 +1,4 @@
 name: Research
-description: Deep web research, academic sources, competitive intel, trend analysis
-
+description: Deep web research, competitor analysis, market intelligence, lead research, trend identification.
 telegram_bot_token_env: RESEARCH_BOT_TOKEN
-
 model: claude-sonnet-4-6

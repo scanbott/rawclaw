@@ -1,6 +1,6 @@
 {
   "name": "rawclaw",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Your AI department in a box — by Raw Growth (rawgrowth.ai)",
   "type": "module",
   "main": "dist/index.js",
@@ -19,7 +19,8 @@
     "setup": "tsx scripts/setup.ts",
     "status": "tsx scripts/status.ts",
     "agent:create": "bash scripts/agent-create.sh",
-    "agent:start": "node dist/index.js --agent"
+    "agent:start": "node dist/index.js --agent",
+    "portal-sync": "tsx scripts/portal-sync.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.34",

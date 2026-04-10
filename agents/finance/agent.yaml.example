@@ -1,0 +1,4 @@
+name: Finance
+description: Revenue tracking, cost monitoring, P&L reporting, API spend, client profitability.
+telegram_bot_token_env: FINANCE_BOT_TOKEN
+model: claude-sonnet-4-6

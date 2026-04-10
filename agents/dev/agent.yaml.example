@@ -1,0 +1,4 @@
+name: Dev
+description: Code, APIs, deployments, MCP servers, webhooks, dashboards. Builds everything technical.
+telegram_bot_token_env: DEV_BOT_TOKEN
+model: claude-sonnet-4-6

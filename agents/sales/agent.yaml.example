@@ -1,0 +1,4 @@
+name: Sales
+description: Sales copy, DMs, proposals, objection handling, CRM hygiene, pipeline management.
+telegram_bot_token_env: SALES_BOT_TOKEN
+model: claude-sonnet-4-6
