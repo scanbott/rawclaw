@@ -69,7 +69,7 @@ activity_log_v2      -- Rich audit trail
 
 ## Get started
 
-![RawClaw setup flow](assets/setup-flow.jpeg)
+![Rawclaw Setup Flow](assets/setup-flow.png)
 
 ### One-line install
 
