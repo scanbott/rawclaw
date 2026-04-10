@@ -1,69 +1,49 @@
 ---
 name: research
-description: Deep research methodology. Web research, competitor analysis, market intelligence. Structures findings into actionable insights.
-triggers: ["research", "investigate", "find out", "analyze", "competitive analysis", "market research"]
+description: Load research methodology, competitor analysis frameworks, and the client research template. Use for any research or analysis task.
+user-invocable: true
 ---
 
-# Research Skill
+# Research -- Rawgrowth
 
-## When to Use This
-
-Use for any research task where you need structured, sourced findings -- not a quick lookup.
-
-## Research Protocol
-
-### Step 1: Define the Question
-Before searching anything, write one sentence: "This research will inform [specific decision]."
-If you can't write that sentence, the request isn't specific enough. Clarify first.
-
-### Step 2: Source Priority
-1. Primary sources: company website, founder interviews, SEC filings, official docs
-2. Secondary sources: reputable press, industry reports, G2/Capterra reviews
-3. Tertiary sources: Reddit, forums, X/Twitter conversations, YouTube comments
-4. Never cite secondary sources as if they're primary
-
-### Step 3: Structured Search
-For competitor research, always check:
-- Their website (homepage, pricing page, about page, blog)
-- Meta Ad Library (facebook.com/ads/library) -- are they running ads?
-- YouTube -- are they creating content? What's performing?
-- G2/Capterra -- what are customers saying?
-- LinkedIn -- how big is the team? What are they hiring for?
-- Indeed reviews -- what do employees say?
-
-### Step 4: Synthesize (Not Summarize)
-Don't list facts. Find patterns. Answer:
-- What's working for them and why?
-- What gap exists that they're not filling?
-- What are their customers frustrated about?
-- What can we learn and apply?
-
-### Step 5: Output
-Save to `workspace/artifacts/research/[topic]-[YYYY-MM-DD].md`
-
-If competitor: also save to `knowledge/competitors/[name].md`
-
-## Output Template
-
-```markdown
-# [Research Topic]
-Date: YYYY-MM-DD
-Question: [The specific decision this informs]
-
-## Key Findings
-[3-5 bullet points -- the most important things]
-
-## Detail
-[Organized sections with sources]
-
-## Implications
-[What this means for us / what to do with it]
-
-## Sources
-[Linked list]
+## Step 0: Query the Knowledge Graph First
+Before starting any web search or external research, query the shared knowledge graph:
 ```
+query("what do we already know about [topic]?", mode="hybrid")
+```
+Use the `raganything` MCP tool. If the answer exists in the graph, skip the external search or use it to sharpen the query. Avoids redundant work and surfaces cross-agent connections.
 
-## Confidence Levels
-- **High:** Primary source, verified
-- **Medium:** Secondary source, plausible
-- **Low:** Inferred or single unverified source -- flag clearly
+## Step N (Final): Ingest Findings into Knowledge Graph
+After completing research, always ingest the summary:
+```
+ingest_text("[full research summary]", metadata={"agent": "ovi", "date": "YYYY-MM-DD", "topic": "...", "task_type": "research"})
+```
+Every research output becomes queryable by all agents going forward.
+
+## Workspace
+Read `marketing/research/CONTEXT.md` for the workspace map and load order.
+
+## Client Research Template
+Covers:
+- Instagram analysis (30 posts)
+- YouTube analysis (20 videos)
+- Twitter analysis (50 tweets)
+- Website/funnel analysis
+- Competitor analysis (5 competitors)
+- Brand voice synthesis
+- Content theme analysis
+- Recommendations
+
+## Competitor Scraping
+- Python tools: `scripts/content-db/populate_transcripts.py`, `scripts/content-db/analyze_competitors.py`
+- yt-dlp for Instagram/YouTube reel metadata
+
+## Research Output Standards
+1. Lead with conclusion, then evidence
+2. Sources cited for every claim
+3. Confidence level flagged: high/medium/low
+4. Tables for comparisons, chronological lists for timelines
+5. Actionable recommendations -- not just data dumps
+
+## ICP Reference
+Read `marketing/brand/identity/02-icp.md` to ensure research targets the right audience.

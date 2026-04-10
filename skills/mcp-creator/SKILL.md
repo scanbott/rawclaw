@@ -1,85 +1,96 @@
 ---
 name: mcp-creator
-description: Build a new MCP (Model Context Protocol) server from scratch. Adds new tools to the agent's capabilities.
-triggers: ["build MCP", "create MCP server", "new MCP", "add tool", "mcp server"]
+description: Build MCP (Model Context Protocol) servers from scratch. Use when the user asks to "build an MCP server", "create an MCP", "make a tool server", "add MCP tools", or needs to connect an API/service as an MCP server for Claude.
 ---
 
-# MCP Creator
+# MCP Creator Skill
 
-## What is an MCP Server
+Build production-ready MCP servers in Python or TypeScript. Load the full implementation guide from `references/implementation-guide.md` before writing any code.
 
-MCP servers extend what agents can do. They expose tools (functions) that agents can call via the Model Context Protocol. If you need to connect to a new API, database, or service -- build an MCP server.
+## Process
 
-## When to Build One
+1. **Clarify the use case**: What API/service/data source is being connected? What tools does the LLM need?
+2. **Read the guide**: `Read references/implementation-guide.md` for templates, patterns, and security requirements
+3. **Choose language**: Python (FastMCP) for most cases. TypeScript for Cloudflare Workers or existing TS codebases.
+4. **Choose transport**: stdio for local/Claude Code. SSE for remote/cloud.
+5. **Build the server** following the mandatory patterns below
+6. **Install it** using the self-install skill patterns
 
-- You need to connect to an external API that doesn't have a CLI
-- You want a reusable tool available across all agents
-- The task is too complex for a bash one-liner skill
+## Mandatory Patterns (never skip these)
 
-## Quick MCP Server Template (TypeScript)
+- **Lifespan management**: Initialize resources once, clean up on shutdown. No per-call connections.
+- **Error handling**: Tools return error strings, never raise exceptions.
+- **Tool docstrings**: These ARE the LLM's instructions. Be specific about what each tool does and when to use it.
+- **Input validation**: Validate and sanitize all inputs. Check for SQL injection, XSS, command injection.
+- **Return strings**: Tools always return strings (use json.dumps for structured data).
+- **Async everything**: All tool functions must be async.
 
-```typescript
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+## Quick Start (Python)
 
-const server = new Server(
-  { name: '[server-name]', version: '1.0.0' },
-  { capabilities: { tools: {} } }
-);
+```python
+from mcp.server.fastmcp import FastMCP, Context
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+import asyncio, json, os
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    {
-      name: 'tool_name',
-      description: 'What this tool does',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          param1: { type: 'string', description: 'What param1 is' },
-        },
-        required: ['param1'],
-      },
-    },
-  ],
-}));
+@dataclass
+class AppContext:
+    client: any
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    client = await init_client()
+    try:
+        yield AppContext(client=client)
+    finally:
+        await client.close()
 
-  if (name === 'tool_name') {
-    // Your logic here
-    return {
-      content: [{ type: 'text', text: 'Result' }],
-    };
-  }
+mcp = FastMCP("server-name", lifespan=app_lifespan)
 
-  throw new Error(`Unknown tool: ${name}`);
-});
+@mcp.tool()
+async def my_tool(ctx: Context, param: str) -> str:
+    """Clear description of what this tool does and when to use it."""
+    try:
+        client = ctx.request_context.lifespan_context.client
+        result = await client.do_thing(param)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error: {str(e)}"
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if __name__ == "__main__":
+    transport = os.getenv("TRANSPORT", "stdio")
+    if transport == "sse":
+        asyncio.run(mcp.run_sse_async())
+    else:
+        asyncio.run(mcp.run_stdio_async())
 ```
 
-## Build Process
-
-1. Create `mcp/[server-name]/` directory
-2. Initialize: `cd mcp/[server-name] && npm init -y && npm install @modelcontextprotocol/sdk`
-3. Create `index.ts` from template above
-4. Add `tsconfig.json` and `package.json` scripts
-5. Build: `npm run build`
-6. Test: `node dist/index.js` -- should start without errors
-
-## Registration
-
-Add to the agent's CLAUDE.md or to a shared MCP config so agents can discover it.
-
-## Dependencies
+## Installation After Build
 
 ```bash
-npm install @modelcontextprotocol/sdk
-npm install -D typescript @types/node tsx
+# Python stdio server
+npx -y @anthropic-ai/claude-code mcp add -s user <name> -- python3 /path/to/server.py
+
+# Python with env vars
+npx -y @anthropic-ai/claude-code mcp add -s user -e API_KEY=xxx <name> -- python3 /path/to/server.py
+
+# Node stdio server
+npx -y @anthropic-ai/claude-code mcp add -s user <name> -- node /path/to/server.js
 ```
+
+## File Structure
+
+```
+~/tools/mcp-servers/<server-name>/
+  server.py (or index.ts)
+  requirements.txt (or package.json)
+  .env.example
+```
+
+## After Building
+
+- Test the server by running it and calling tools
+- Install it with `mcp add`
+- Update `self-install/SKILL.md` "Currently Installed" table
+- Update CLAUDE.md if significant

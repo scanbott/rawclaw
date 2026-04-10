@@ -1,73 +1,248 @@
 ---
-name: steal
-description: Extract everything useful from any resource -- GitHub repo, YouTube video, article, URL, or concept. Structures it into actionable knowledge.
-triggers: ["steal this", "extract from", "analyze this URL", "break down this", "pull everything from"]
+name: robber
+description: Extracts everything useful from any resource (GitHub repo, YouTube video, Instagram reel, Twitter/X post, or any URL) and maps it to Rawgrowth. Code/tools -> Extract & Report. Strategy/content/frameworks -> Extract & Implement into MD files. Triggers on "/robber", "rob this", "steal from this", "extract from", or when a URL is passed with intent to analyze.
+user-invocable: true
+context: fork
 ---
 
-# Steal Skill
+# Robber
 
-"Good artists copy, great artists steal." Use this to extract the framework from anything worth studying.
+**Flow:** Detect resource type -> Fetch & read -> Determine mode -> Extract -> Route to workspace -> Report or Implement -> Confirm
 
-## What You Can Steal From
+No pauses. Run end to end once triggered.
 
-- YouTube videos (transcript → framework)
-- GitHub repos (architecture → pattern)
-- Articles / blog posts (argument → distilled principles)
-- Competitor websites (positioning → gap analysis)
-- Sales pages / landing pages (copy structure → swipe file)
-- Courses / books (system → actionable summary)
-- Podcast episodes (insights → key takeaways)
+Parse the user's message for:
+- **resource** (required) -- a URL, repo link, or pasted text to analyze
+- **mode override** (optional) -- "report only" or "implement" if the user specifies
 
-## Process
+---
 
-### For YouTube Videos
-1. Get the transcript (use browser tools or yt-dlp)
-2. Extract: what's the core argument? What's the framework? What are the 3-5 actionable steps?
-3. Identify the hook structure -- how did they open?
-4. Note: what made this perform well? (title, thumbnail concept, pacing)
-5. Save to `workspace/artifacts/research/steal-[source]-[date].md`
+## Step 1: Identify the Resource Type
 
-### For Websites / Landing Pages
-1. Screenshot or read the full page
-2. Extract: headline, subheadline, problem statement, mechanism, proof, offer, CTA
-3. Note: what's their positioning? Who's the ICP? What objections do they address?
-4. Rate the copy 1-10 with notes
-5. Save swipe file to `workspace/artifacts/copy/swipe/`
+Classify the resource from the user's message:
 
-### For GitHub Repos
-1. Read the README and main architecture files
-2. Extract: what problem does it solve? What's the core pattern? What can we reuse?
-3. Note any patterns worth adopting
-4. Save to `workspace/artifacts/research/`
+| Input | Type |
+|-------|------|
+| `github.com/*` | GitHub repo |
+| `youtube.com/*` or `youtu.be/*` | YouTube video |
+| `instagram.com/*` | Instagram post/reel |
+| `twitter.com/*` or `x.com/*` | Twitter/X post |
+| Any other URL | Generic web resource |
+| Raw pasted text | Text content |
 
-### For Competitor Positioning
-1. Read homepage, pricing page, about page
-2. Extract: claim, ICP, proof points, differentiators
-3. Identify gaps -- what are they NOT saying?
-4. Save to `knowledge/competitors/[name].md`
+---
 
-## Output Format
+## Step 2: Fetch the Resource
 
-```markdown
-# Steal: [Source Name]
-URL: [link]
-Date: YYYY-MM-DD
-Type: youtube | website | repo | article
+**GitHub repo:**
+- WebFetch the repo landing page: `https://github.com/<owner>/<repo>`
+- Fetch README: `https://raw.githubusercontent.com/<owner>/<repo>/main/README.md` (fallback to `/master/`)
+- WebFetch the file tree to understand structure
+- Use mcp__github__get_file_contents for key files: package.json, index files, /src or /lib entry points, any scripts/
+- Focus on: what it does, how it works, what APIs/patterns it uses
 
-## What This Is
-[One paragraph: what it is and why it's worth studying]
+**YouTube video:**
+- WebFetch `https://www.youtube.com/watch?v=<id>` for title + description
+- WebFetch `https://youtubetranscript.com/?v=<id>` for transcript
+- Fallback: invoke yt-search skill with the video title to pull metadata
 
-## Core Framework / Structure
-[The repeatable pattern extracted]
+**Instagram reel/post:**
+- Use agent-browser skill to navigate to the URL
+- Screenshot and extract caption, visible text, and core concept
 
-## Key Takeaways
-1.
-2.
-3.
+**Twitter/X post:**
+- WebFetch the URL directly
+- If blocked: replace twitter.com or x.com with nitter.net and retry
+- Extract post content and any thread replies
 
-## What to Apply
-[Specific things we can use immediately]
+**Generic URL:**
+- WebFetch the URL
+- If it fails or returns empty: use agent-browser to render and screenshot
 
-## Raw Notes
-[Anything else worth keeping]
+**Raw pasted text:**
+- Skip fetch, analyze the content directly
+
+---
+
+## Step 3: Determine Mode
+
+If user said "report only" -> Mode 1
+If user said "implement" -> Mode 2
+
+Otherwise, classify automatically:
+
+**Mode 1 (Extract & Report)** if resource is primarily:
+- Code, scripts, repos, tools, APIs, libraries, infrastructure, MCP servers, automation patterns
+
+**Mode 2 (Extract & Implement)** if resource is primarily:
+- Strategy, marketing, sales tactics, content frameworks, positioning, copywriting, client delivery, business systems, operational SOPs
+
+If genuinely ambiguous (e.g. a repo that also documents a full methodology), ask ONE question:
+"This has both code and strategy. Report on the technical side, implement the strategy side, or both?"
+
+---
+
+## Step 4a: Mode 1 -- Extract & Report
+
+Scan everything and identify what's useful for Rawgrowth.
+
+**Rawgrowth context to map findings against:**
+- Core offer: install AI departments into 7-9 figure businesses. $20K install + $10K/mo retainer
+- Stack: Claude Code agents, Supabase, Hono, Vercel, n8n, MCP servers, Telegram bot, cron scheduler, SQLite
+- Agents: Scan (COO), Quilly (content), Larry (sales), Ovi (research), Cleo (clients), Ali (dev), Sam (finance)
+- Flywheel: Signal -> Intelligence -> Expression
+- Always hunting for: new MCP integrations, automation patterns, agent architecture ideas, APIs that plug into our stack, workflow tools, dashboard enhancements
+
+**For each finding:**
+- What it is (one line)
+- Why it's relevant to Rawgrowth specifically
+- How to implement it (specific: which agent, which file, what it connects to)
+- Effort: Quick Win (<1hr) / Medium (1 day) / Big Lift (multi-day)
+
+**Output:**
+
 ```
+ROBBER REPORT
+Resource: [name + URL]
+Type: [GitHub repo / tool / framework / etc.]
+
+--- FINDINGS ---
+
+[Finding name]
+What: [one line]
+Relevant because: [specific Rawgrowth context]
+Implementation: [exact action -- e.g. "wrap as MCP server, add to Ali's stack" or "add pattern to skill X"]
+Effort: Quick Win / Medium / Big Lift
+
+[repeat per finding]
+
+--- PRIORITY QUEUE ---
+
+Quick Wins (do now):
+- [item] -> [action]
+
+Medium Lifts (schedule):
+- [item] -> [action]
+
+Big Lifts (plan):
+- [item] -> [action]
+
+Recommended next step: [single most valuable action]
+```
+
+---
+
+## Step 4b: Mode 2 -- Extract & Implement
+
+Pull every tactic and framework from the resource. Filter hard. Implement the relevant ones directly into the system.
+
+**Keep anything touching:**
+- How to sell, position, or price AI services
+- Content strategy (YouTube, Instagram, LinkedIn)
+- Client delivery, onboarding, or retention
+- Business systems and operational frameworks
+- Sales scripts, DM frameworks, objection handling
+- Copywriting examples (VSLs, emails, sales pages, ad copy)
+- Agency or consulting business models
+- AI implementation approaches or mental models
+
+**Files to consider updating:**
+- `CLAUDE.md` -- core OS config (project root)
+- `agents/*/CLAUDE.md` -- agent-specific context
+- `~/.claude/skills/brand-voice/SKILL.md` -- voice, positioning, messaging
+- `~/.claude/skills/sales/SKILL.md` -- sales tactics, frameworks
+- `~/.claude/skills/content-creation/SKILL.md` -- content frameworks, hooks
+- `~/.claude/skills/research/SKILL.md` -- research methods
+- `marketing/brand/copy-examples/` -- copy examples by type (vsl/, email/, sales-page/, social/, ad/)
+- `ops/strategy/` -- strategy and positioning frameworks
+- `sales/scripts/` or `sales/objections/` -- sales tactics
+- `marketing/content/frameworks/` -- content creation frameworks
+- `marketing/research/` -- market intel and competitor data
+
+**Implementation rules:**
+- Read each target file before editing
+- Write in Chris's voice: short sentences, no fluff, engineer vocabulary, contractions always, no em dashes
+- Add tactics as concrete, actionable lines -- not summaries or paraphrases
+- Fold into existing sections where they fit. Don't create bloat
+- Route new content to the correct workspace (see Workspace Routing below)
+- Surgical edits only -- don't rewrite sections unless they're wrong
+
+**Output:**
+
+```
+ROBBER REPORT -- IMPLEMENTED
+Resource: [name + URL]
+Type: [YouTube video / article / post / etc.]
+
+--- TACTICS EXTRACTED ---
+- [tactic 1]
+- [tactic 2]
+...
+
+--- IMPLEMENTED ---
+[file path]
+  + [what was added or changed]
+  + [what was added or changed]
+
+[file path]
+  + [what was added or changed]
+
+--- SKIPPED (not relevant to Rawgrowth) ---
+- [tactic] -- [why skipped]
+```
+
+---
+
+## Step 4c: Workspace Routing
+
+After extraction, route content to the correct workspace based on type:
+
+| Content Type | Route To | Naming |
+|-------------|----------|--------|
+| Copy examples (VSLs, emails, sales pages, ad copy) | `marketing/brand/copy-examples/[type]/` | `[source]-[type]-[topic].md` |
+| Strategy/positioning/pricing frameworks | `ops/strategy/` | `[topic]-[YYYY-MM].md` |
+| Content creation frameworks/hooks | `marketing/content/frameworks/` | `[source]-[framework-name].md` |
+| Sales scripts/objection handling | `sales/scripts/` or `sales/objections/` | `[source]-[tactic-name].md` |
+| Market research/competitor intel | `marketing/research/` | `[topic]-[YYYY-MM].md` |
+| Course material/training | Extract frameworks → relevant workspace, full extraction → `marketing/research/[source]-extraction-[YYYY-MM].md` |
+| Code/tools (Mode 1) | Report only. Route implementation to Ali if requested. | N/A |
+
+**Frontmatter for all new files:**
+```yaml
+---
+source: [URL or resource name]
+author: [who created it]
+type: [vsl/email/sales-page/framework/tactic/research/etc.]
+extracted_from: robber
+date_added: [YYYY-MM-DD]
+tags: [relevant tags]
+---
+```
+
+**Post-routing checklist:**
+1. Verify file follows workspace naming conventions
+2. Frontmatter includes source URL and extraction date
+3. Log to hive_mind (Step 5 below)
+4. Report to Chris: what was extracted, where it went, top 3 takeaways
+
+---
+
+## Step 5: Log to Hive Mind
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+sqlite3 "$PROJECT_ROOT/store/businessos.db" "INSERT INTO hive_mind (agent_id, chat_id, action, summary, artifacts, created_at) VALUES ('dev', 'robber', 'robber_extract', 'Robbed [RESOURCE]: [ONE LINE SUMMARY]', NULL, strftime('%s','now'));"
+```
+
+---
+
+## Error Handling
+
+| Problem | Solution |
+|---------|----------|
+| WebFetch blocked / 403 | Use agent-browser to render the page visually |
+| YouTube no transcript available | Use title + description + top comments to reconstruct content |
+| Instagram login wall | Screenshot whatever is visible, extract from caption and visual context |
+| GitHub repo is private | Report back "repo is private -- share access or a public mirror" |
+| Resource is a massive repo | Focus on README, package.json, entry points in /src, and any /docs folder |
+| Content is ambiguous | Default to Mode 2 (strategy) |

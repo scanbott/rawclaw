@@ -1,6 +1,6 @@
 ---
 name: slack
-description: Manage Slack from Claude Code. List conversations, read messages, send replies, search for channels and DMs.
+description: Manage Slack from Claude Code. List conversations, read messages, send replies, search for channels and DMs. Also handles incoming Slack events (mentions, DMs).
 allowed-tools: Bash(cd * && node dist/slack-cli.js *)
 ---
 
@@ -8,80 +8,68 @@ allowed-tools: Bash(cd * && node dist/slack-cli.js *)
 
 ## Purpose
 
-Interact with your Slack workspace using natural language from Claude Code.
+Interact with the Rawgrowth Slack workspace using natural language. Also receives and responds to incoming messages via the Events API.
 
-## Prerequisites
+## Auth
 
-You need a `SLACK_USER_TOKEN` in your RawClaw `.env` file. If you haven't set this up yet, follow these steps:
+Uses `SLACK_BOT_TOKEN` (xoxb-) from `.env`. Falls back to `SLACK_USER_TOKEN` (xoxp-) for backward compat.
 
-### Getting your Slack User OAuth Token
+Bot identity: **biggy** in the Rawgrowth workspace (rawgrowthworkspace.slack.com).
 
-1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App**
-2. Choose **From scratch** (not "From an app manifest")
-3. Name it (e.g. `RawClaw`), select your workspace, click **Create App**
-4. In the **left sidebar**, click **OAuth & Permissions**
-5. Scroll down to the **Scopes** section. You'll see **Bot Token Scopes** and **User Token Scopes**
-6. **Ignore Bot Token Scopes.** Under **User Token Scopes**, click **Add an OAuth Scope** and add all of these:
+## Incoming Messages (Events API)
 
-   - `channels:history` — View messages in public channels
-   - `channels:read` — View basic info about public channels
-   - `chat:write` — Send messages on your behalf
-   - `groups:history` — View messages in private channels
-   - `groups:read` — View basic info about private channels
-   - `im:history` — View direct messages
-   - `im:read` — View basic info about DMs
-   - `mpim:history` — View group direct messages
-   - `mpim:read` — View basic info about group DMs
-   - `search:read` — Search workspace content
-   - `users:read` — View people in the workspace
+Slack sends webhooks to `dashboard.rawgrowth.ai/slack/events` when:
+- Someone @mentions Biggy in a channel
+- Someone DMs Biggy directly
 
-7. Scroll back up, click **Install to Workspace**, then click **Allow**
-8. Copy the **User OAuth Token** (starts with `xoxp-`)
-9. Add to your `.env`: `SLACK_USER_TOKEN=xoxp-your-token-here`
+The message routes through the full agent pipeline (memory, context, agent execution) and replies in the same Slack thread.
 
-## Setup
+**Slack app config required:**
+1. Event Subscriptions > Enable > Request URL: `https://dashboard.rawgrowth.ai/slack/events?token=DASHBOARD_TOKEN`
+2. Subscribe to bot events: `app_mention`, `message.im`
+3. App Home > Messages Tab enabled + "Allow users to send messages"
 
-The CLI lives at the RawClaw project root. All commands must run from the project directory (the CLI reads `.env` from `cwd`):
+## Outbound Commands (CLI)
+
+The CLI lives at the BusinessOS project root:
 
 ```bash
-cd /path/to/rawclaw && node dist/slack-cli.js <command>
+cd /path/to/businessos && node dist/slack-cli.js <command>
 ```
-
-## Commands
 
 ### List conversations (with unread counts)
 
 ```bash
-cd /path/to/rawclaw && node dist/slack-cli.js list
-cd /path/to/rawclaw && node dist/slack-cli.js list --limit 10
+cd /path/to/businessos && node dist/slack-cli.js list
+cd /path/to/businessos && node dist/slack-cli.js list --limit 10
 ```
 
-Returns JSON array of conversations sorted by unread count then recency. Each object has: `id`, `name`, `isIm`, `unreadCount`, `lastMessage`, `lastMessageTs`.
+Returns JSON array sorted by unread count then recency. Each object: `id`, `name`, `isIm`, `unreadCount`, `lastMessage`, `lastMessageTs`.
 
 ### Read messages from a conversation
 
 ```bash
-cd /path/to/rawclaw && node dist/slack-cli.js read <channel_id>
-cd /path/to/rawclaw && node dist/slack-cli.js read <channel_id> --limit 30
+cd /path/to/businessos && node dist/slack-cli.js read <channel_id>
+cd /path/to/businessos && node dist/slack-cli.js read <channel_id> --limit 30
 ```
 
-Returns JSON array of messages (oldest first). Each object has: `text`, `userName`, `fromMe`, `ts`, `threadTs`.
+Returns JSON array of messages (oldest first): `text`, `userName`, `fromMe`, `ts`, `threadTs`.
 
 ### Send a message
 
 ```bash
-cd /path/to/rawclaw && node dist/slack-cli.js send <channel_id> "message text"
-cd /path/to/rawclaw && node dist/slack-cli.js send <channel_id> "reply text" --thread-ts 1234567890.123456
+cd /path/to/businessos && node dist/slack-cli.js send <channel_id> "message text"
+cd /path/to/businessos && node dist/slack-cli.js send <channel_id> "reply text" --thread-ts 1234567890.123456
 ```
 
 ### Search conversations by name
 
 ```bash
-cd /path/to/rawclaw && node dist/slack-cli.js search "jane"
-cd /path/to/rawclaw && node dist/slack-cli.js search "general"
+cd /path/to/businessos && node dist/slack-cli.js search "jane"
+cd /path/to/businessos && node dist/slack-cli.js search "general"
 ```
 
-Fuzzy matches against conversation names. Use this to find channel IDs when you need to message someone or read a channel.
+Fuzzy matches against conversation names. Use this to find channel IDs.
 
 ## Workflow
 

@@ -1,7 +1,7 @@
 ---
 name: gmail
 description: Manage your Gmail inbox from Claude Code. List, read, triage, reply, send, and create filters.
-allowed-tools: Bash(RAWCLAW_DIR=* ~/.venv/bin/python3 ~/.config/gmail/gmail.py *)
+allowed-tools: Bash(BUSINESSOS_DIR=* ~/.venv/bin/python3 ~/.config/gmail/gmail.py *)
 ---
 
 # Gmail Skill
@@ -12,10 +12,10 @@ Read, triage, reply, and send emails from your Gmail inbox via Claude Code.
 
 ## Environment
 
-The Gmail CLI reads credential paths from environment variables, loaded from RawClaw's `.env` via `RAWCLAW_DIR`. Every command MUST use this prefix:
+The Gmail CLI reads credential paths from environment variables, loaded from BusinessOS's `.env` via `BUSINESSOS_DIR`. Every command MUST use this prefix:
 
 ```
-RAWCLAW_DIR=/path/to/rawclaw
+BUSINESSOS_DIR=/path/to/businessos
 ```
 
 Your `.env` should contain:
@@ -32,7 +32,7 @@ If these aren't set, the script falls back to `~/.config/gmail/credentials.json`
 ### List inbox (full inbox, grouped by thread)
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py list --all
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py list --all
 ```
 
 Returns JSON array grouped by thread. Each entry has: `id`, `threadId`, `from`, `subject`, `date`, `snippet`, `unread`, `thread_count`. If `thread_count > 1`, also includes `all_ids`.
@@ -42,19 +42,19 @@ Returns JSON array grouped by thread. Each entry has: `id`, `threadId`, `from`, 
 ### List with time filter
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py list --hours 48
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py list --hours 48
 ```
 
 ### Read full email
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py read <msg_id>
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py read <msg_id>
 ```
 
 ### Move email to label/folder
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py move <msg_id> "Label Name"
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py move <msg_id> "Label Name"
 ```
 
 - If the label doesn't exist, it creates it automatically
@@ -63,13 +63,13 @@ RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py move <
 ### List all labels
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py labels
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py labels
 ```
 
 ### Reply to an email
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py reply <msg_id> "Your reply body here"
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py reply <msg_id> "Your reply body here"
 ```
 
 - Automatically threads correctly (In-Reply-To, References headers)
@@ -79,25 +79,25 @@ RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py reply 
 ### Reply with attachments
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py reply <msg_id> "Your reply body here" --attachments "/path/to/file1.pdf,/path/to/file2.png"
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py reply <msg_id> "Your reply body here" --attachments "/path/to/file1.pdf,/path/to/file2.png"
 ```
 
 ### Send a new email
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py send "to@example.com" "Subject here" "Body here"
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py send "to@example.com" "Subject here" "Body here"
 ```
 
 ### Send with attachments
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py send "to@example.com" "Subject" "Body" --attachments "/path/to/file.pdf,/path/to/other.xlsx"
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py send "to@example.com" "Subject" "Body" --attachments "/path/to/file.pdf,/path/to/other.xlsx"
 ```
 
 ### Create a Gmail filter (auto-sort rule)
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py filter --from "sender@example.com" --label "LabelName" --archive --read
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py filter --from "sender@example.com" --label "LabelName" --archive --read
 ```
 
 - `--from` / `--to` / `--subject` / `--query` for criteria
@@ -107,13 +107,13 @@ RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py filter
 ### List existing filters
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py filters
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py filters
 ```
 
 ### Re-authenticate
 
 ```bash
-RAWCLAW_DIR=/path/to/rawclaw ~/.venv/bin/python3 ~/.config/gmail/gmail.py auth
+BUSINESSOS_DIR=/path/to/businessos ~/.venv/bin/python3 ~/.config/gmail/gmail.py auth
 ```
 
 ## Workflow
