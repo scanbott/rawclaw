@@ -65,6 +65,13 @@
       "triggers": ["copywriting", "write copy", "landing page"],
       "category": "content",
       "pre_installed": false
+    },
+    {
+      "name": "saas",
+      "description": "Full-stack SaaS builder -- idea to deployed product in one command",
+      "triggers": ["/saas", "build a saas", "create a saas", "build an app", "launch a product"],
+      "category": "engineering",
+      "pre_installed": false
     }
   ]
 }
