@@ -193,8 +193,9 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     if (path === '/api/login' || path === '/api/logout' || path === '/api/auth-check' || path === '/health') {
       return next();
     }
-    // Serve dashboard page (includes login screen) — always accessible
-    if (path === '/' && c.req.method === 'GET') {
+    // Serve dashboard/Life OS pages (includes login screen) — always accessible
+    const publicPages = ['/', '/selling', '/recruiting', '/brand', '/personal', '/agents', '/ai'];
+    if (publicPages.includes(path) && c.req.method === 'GET') {
       return next();
     }
     // Also support legacy ?token= in URL for backward compat (but token is NOT exposed in HTML anymore)
