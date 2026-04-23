@@ -1,6 +1,6 @@
 import { generateContent, parseJsonResponse } from './gemini.js';
 import { cosineSimilarity, embedText } from './embeddings.js';
-import { getMemoriesWithEmbeddings, saveStructuredMemory, saveMemoryEmbedding } from './db.js';
+import { getMemoriesWithEmbeddings, saveStructuredMemory, saveMemoryEmbedding, type MemoryCategory } from './db.js';
 import { logger } from './logger.js';
 
 // Callback for notifying when a high-importance memory is created.
@@ -16,6 +16,7 @@ interface ExtractionResult {
   entities: string[];
   topics: string[];
   importance: number;
+  category?: MemoryCategory;
 }
 
 const EXTRACTION_PROMPT = `You are a memory extraction agent. Given a conversation exchange between a user and their AI assistant, decide if it contains information worth remembering LONG-TERM (weeks/months from now).
@@ -52,8 +53,17 @@ If extracting, return JSON:
   "summary": "1-2 sentence summary focused on the LASTING FACT, not the conversation. Write as a rule or fact, not a narrative.",
   "entities": ["entity1", "entity2"],
   "topics": ["topic1", "topic2"],
-  "importance": 0.0-1.0
+  "importance": 0.0-1.0,
+  "category": "user_pref|project_decision|standing_rule|entity_info|workflow|correction"
 }
+
+Category guide:
+- "user_pref": User preferences or habits (e.g. "prefers dark mode", "likes concise responses")
+- "project_decision": Technical or business decisions (e.g. "we chose PostgreSQL for the DB")
+- "standing_rule": Rules that apply going forward (e.g. "always CC the manager on proposals")
+- "entity_info": Key facts about people, companies, or things (e.g. "Sarah is the VP of Sales")
+- "workflow": Recurring processes or routines (e.g. "weekly standup is Mondays at 9am")
+- "correction": Corrections to previous behavior (e.g. "don't use emojis in emails to clients")
 
 Importance guide:
 - 0.8-1.0: Core identity, strong preferences, critical business rules, relationship dynamics
@@ -125,6 +135,11 @@ export async function ingestConversationTurn(
       }
     }
 
+    // Determine category and initial trust score
+    const category = result.category ?? null;
+    // Standing rules and corrections start with higher trust
+    const initialTrust = (category === 'standing_rule' || category === 'correction') ? 0.7 : 0.5;
+
     const memoryId = saveStructuredMemory(
       chatId,
       userMessage,
@@ -134,6 +149,8 @@ export async function ingestConversationTurn(
       importance,
       'conversation',
       agentId,
+      category,
+      initialTrust,
     );
 
     // Store the embedding we already generated

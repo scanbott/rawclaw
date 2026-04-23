@@ -338,6 +338,34 @@ function createSchema(database: Database.Database): void {
       INSERT INTO memories_fts(rowid, summary, raw_text, entities, topics)
         VALUES (new.id, new.summary, new.raw_text, new.entities, new.topics);
     END;
+
+    -- ── Conversation FTS5 (cross-session search) ───────────────────
+    CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts5(
+      content,
+      content=conversation_log,
+      content_rowid=id
+    );
+
+    CREATE TRIGGER IF NOT EXISTS convo_fts_insert AFTER INSERT ON conversation_log BEGIN
+      INSERT INTO conversation_fts(rowid, content) VALUES (new.id, new.content);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS convo_fts_delete AFTER DELETE ON conversation_log BEGIN
+      INSERT INTO conversation_fts(conversation_fts, rowid, content)
+        VALUES ('delete', old.id, old.content);
+    END;
+
+    -- ── Skills Log ─────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS skills_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      skill_name  TEXT NOT NULL,
+      action      TEXT NOT NULL,
+      agent_id    TEXT NOT NULL DEFAULT 'main',
+      chat_id     TEXT NOT NULL,
+      source_turn TEXT,
+      created_at  INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_skills_log_name ON skills_log(skill_name, created_at DESC);
   `);
 }
 
@@ -594,6 +622,64 @@ function runMigrations(database: Database.Database): void {
     `);
     logger.info('Migration: made mission_tasks.assigned_agent nullable');
   }
+
+  // ── Hermes-inspired: category + trust_score on memories ─────────
+  const memColsFinal = database.prepare(`PRAGMA table_info(memories)`).all() as Array<{ name: string }>;
+  const memColNamesFinal = memColsFinal.map((c) => c.name);
+
+  if (!memColNamesFinal.includes('category')) {
+    database.exec(`ALTER TABLE memories ADD COLUMN category TEXT DEFAULT NULL`);
+    database.exec(`CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(chat_id, category)`);
+    logger.info('Migration: added category column to memories table');
+  }
+
+  if (!memColNamesFinal.includes('trust_score')) {
+    database.exec(`ALTER TABLE memories ADD COLUMN trust_score REAL NOT NULL DEFAULT 0.5`);
+    logger.info('Migration: added trust_score column to memories table');
+  }
+
+  // ── Hermes-inspired: FTS5 on conversation_log ──────────────────
+  const hasFts = database.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_fts'`,
+  ).get();
+  if (!hasFts) {
+    database.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts5(
+        content,
+        content=conversation_log,
+        content_rowid=id
+      );
+      CREATE TRIGGER IF NOT EXISTS convo_fts_insert AFTER INSERT ON conversation_log BEGIN
+        INSERT INTO conversation_fts(rowid, content) VALUES (new.id, new.content);
+      END;
+      CREATE TRIGGER IF NOT EXISTS convo_fts_delete AFTER DELETE ON conversation_log BEGIN
+        INSERT INTO conversation_fts(conversation_fts, rowid, content)
+          VALUES ('delete', old.id, old.content);
+      END;
+      INSERT INTO conversation_fts(conversation_fts) VALUES('rebuild');
+    `);
+    logger.info('Migration: created conversation_fts table and indexed existing rows');
+  }
+
+  // ── Skills log table ───────────────────────────────────────────
+  const hasSkillsLog = database.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='skills_log'`,
+  ).get();
+  if (!hasSkillsLog) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS skills_log (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        skill_name  TEXT NOT NULL,
+        action      TEXT NOT NULL,
+        agent_id    TEXT NOT NULL DEFAULT 'main',
+        chat_id     TEXT NOT NULL,
+        source_turn TEXT,
+        created_at  INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_skills_log_name ON skills_log(skill_name, created_at DESC);
+    `);
+    logger.info('Migration: created skills_log table');
+  }
 }
 
 /** @internal - for tests only. Creates a fresh in-memory database. */
@@ -635,6 +721,8 @@ export function clearSession(chatId: string, agentId = 'main'): void {
 
 // ── Memory (V2: structured with LLM extraction) ────────────────────
 
+export type MemoryCategory = 'user_pref' | 'project_decision' | 'standing_rule' | 'entity_info' | 'workflow' | 'correction' | null;
+
 export interface Memory {
   id: number;
   chat_id: string;
@@ -650,6 +738,8 @@ export interface Memory {
   consolidated: number;
   pinned: number;      // 1 = permanent, never decays
   embedding: string | null; // JSON array of floats
+  category: MemoryCategory;
+  trust_score: number;
   created_at: number;
   accessed_at: number;
 }
@@ -674,11 +764,13 @@ export function saveStructuredMemory(
   importance: number,
   source = 'conversation',
   agentId = 'main',
+  category: MemoryCategory = null,
+  trustScore = 0.5,
 ): number {
   const now = Math.floor(Date.now() / 1000);
   const result = db.prepare(
-    `INSERT INTO memories (chat_id, source, raw_text, summary, entities, topics, importance, agent_id, created_at, accessed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO memories (chat_id, source, raw_text, summary, entities, topics, importance, agent_id, category, trust_score, created_at, accessed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     chatId,
     source,
@@ -688,6 +780,8 @@ export function saveStructuredMemory(
     JSON.stringify(topics),
     importance,
     agentId,
+    category,
+    trustScore,
     now,
     now,
   );
@@ -876,8 +970,11 @@ export function batchUpdateMemoryRelevance(
  */
 export function decayMemories(): void {
   const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+  // Trust score >= 0.8 decays 50% slower (multiply factor closer to 1.0)
   db.prepare(`
     UPDATE memories SET salience = salience * CASE
+      WHEN trust_score >= 0.8 AND importance >= 0.8 THEN 0.995
+      WHEN trust_score >= 0.8 AND importance >= 0.5 THEN 0.99
       WHEN importance >= 0.8 THEN 0.99
       WHEN importance >= 0.5 THEN 0.98
       ELSE 0.95
@@ -1271,6 +1368,218 @@ export function searchConversationHistory(
        ORDER BY created_at DESC LIMIT ?`,
     )
     .all(...params, limit) as ConversationTurn[];
+}
+
+// ── FTS5 Conversation Search (Hermes-inspired) ──────────────────────
+
+export interface ConversationSearchResult {
+  id: number;
+  chat_id: string;
+  session_id: string | null;
+  role: string;
+  content: string;
+  snippet: string;
+  created_at: number;
+  agent_id: string;
+  context_before: { role: string; content: string } | null;
+  context_after: { role: string; content: string } | null;
+}
+
+/**
+ * Sanitize a user query for FTS5 MATCH syntax.
+ * Strips special characters, wraps terms for prefix matching.
+ */
+function sanitizeFtsQuery(query: string): string {
+  // Remove FTS5 operators and special chars
+  let clean = query
+    .replace(/[""]/g, '"')
+    .replace(/[{}()\[\]^~*:!]/g, '')
+    .replace(/\bAND\b/gi, '')
+    .replace(/\bOR\b/gi, '')
+    .replace(/\bNOT\b/gi, '')
+    .trim();
+
+  // Split into terms and filter
+  const terms = clean
+    .split(/\s+/)
+    .filter((t) => t.length >= 2)
+    .slice(0, 10);
+
+  if (terms.length === 0) return '';
+
+  // Join with implicit AND (FTS5 default)
+  return terms.map((t) => `"${t}"`).join(' ');
+}
+
+/**
+ * Full-text search across all conversation history using FTS5.
+ * Returns ranked results with snippets and surrounding context.
+ */
+export function searchConversationFTS(
+  chatId: string,
+  query: string,
+  agentId?: string,
+  limit = 10,
+  daysBack?: number,
+): ConversationSearchResult[] {
+  const ftsQuery = sanitizeFtsQuery(query);
+  if (!ftsQuery) return [];
+
+  try {
+    const conditions = ['cl.chat_id = ?'];
+    const params: (string | number)[] = [chatId];
+
+    if (daysBack) {
+      const cutoff = Math.floor(Date.now() / 1000) - (daysBack * 86400);
+      conditions.push('cl.created_at > ?');
+      params.push(cutoff);
+    }
+
+    if (agentId) {
+      conditions.push('cl.agent_id = ?');
+      params.push(agentId);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    const rows = db.prepare(`
+      SELECT cl.*, snippet(conversation_fts, 0, '**', '**', '...', 32) AS snippet
+      FROM conversation_fts cf
+      JOIN conversation_log cl ON cl.id = cf.rowid
+      WHERE cf.content MATCH ? AND ${whereClause}
+      ORDER BY bm25(conversation_fts) LIMIT ?
+    `).all(ftsQuery, ...params, limit) as Array<ConversationTurn & { snippet: string }>;
+
+    return rows.map((row) => {
+      // Get surrounding context (±1 message)
+      const before = db.prepare(
+        `SELECT role, content FROM conversation_log WHERE chat_id = ? AND id < ? ORDER BY id DESC LIMIT 1`,
+      ).get(chatId, row.id) as { role: string; content: string } | undefined;
+
+      const after = db.prepare(
+        `SELECT role, content FROM conversation_log WHERE chat_id = ? AND id > ? ORDER BY id ASC LIMIT 1`,
+      ).get(chatId, row.id) as { role: string; content: string } | undefined;
+
+      return {
+        id: row.id,
+        chat_id: row.chat_id,
+        session_id: row.session_id,
+        role: row.role,
+        content: row.content,
+        snippet: row.snippet,
+        created_at: row.created_at,
+        agent_id: (row as unknown as Record<string, unknown>).agent_id as string ?? 'main',
+        context_before: before ?? null,
+        context_after: after ?? null,
+      };
+    });
+  } catch (err) {
+    // FTS5 query syntax error — fall back to LIKE search
+    logger.warn('FTS5 search failed, falling back to LIKE: %s', (err as Error).message);
+    return searchConversationHistory(chatId, query, agentId, daysBack ?? 30, limit).map((t) => ({
+      id: t.id,
+      chat_id: t.chat_id,
+      session_id: t.session_id,
+      role: t.role,
+      content: t.content,
+      snippet: t.content.slice(0, 200),
+      created_at: t.created_at,
+      agent_id: (t as unknown as Record<string, unknown>).agent_id as string ?? 'main',
+      context_before: null,
+      context_after: null,
+    }));
+  }
+}
+
+// ── Structured Fact Queries (Hermes-inspired) ────────────────────────
+
+/**
+ * Get memories by category (e.g. standing_rule, user_pref).
+ * Returns sorted by trust_score DESC for priority ordering.
+ */
+export function getFactsByCategory(
+  chatId: string,
+  category: MemoryCategory,
+  limit = 10,
+): Memory[] {
+  return db.prepare(`
+    SELECT * FROM memories
+    WHERE chat_id = ? AND category = ? AND superseded_by IS NULL AND salience >= 0.05
+    ORDER BY trust_score DESC, importance DESC
+    LIMIT ?
+  `).all(chatId, category, limit) as Memory[];
+}
+
+/**
+ * Get memories mentioning a specific entity.
+ */
+export function getFactsByEntity(
+  chatId: string,
+  entityName: string,
+  limit = 10,
+): Memory[] {
+  const pattern = `%${entityName}%`;
+  return db.prepare(`
+    SELECT * FROM memories
+    WHERE chat_id = ? AND entities LIKE ? AND superseded_by IS NULL AND salience >= 0.05
+    ORDER BY trust_score DESC, importance DESC
+    LIMIT ?
+  `).all(chatId, pattern, limit) as Memory[];
+}
+
+/**
+ * Adjust trust score for a memory. Clamps to [0, 1].
+ */
+export function updateTrustScore(memoryId: number, delta: number): void {
+  db.prepare(`
+    UPDATE memories SET trust_score = MAX(0, MIN(1, trust_score + ?)) WHERE id = ?
+  `).run(delta, memoryId);
+}
+
+/**
+ * Get standing rules and user preferences that should always be in context.
+ */
+export function getStandingContext(chatId: string, limit = 5): Memory[] {
+  return db.prepare(`
+    SELECT * FROM memories
+    WHERE chat_id = ? AND category IN ('standing_rule', 'user_pref')
+      AND superseded_by IS NULL AND salience >= 0.05
+    ORDER BY trust_score DESC, importance DESC
+    LIMIT ?
+  `).all(chatId, limit) as Memory[];
+}
+
+// ── Skills Log ───────────────────────────────────────────────────────
+
+export function logSkillAction(
+  skillName: string,
+  action: 'create' | 'patch' | 'delete',
+  agentId: string,
+  chatId: string,
+  sourceTurn?: string,
+): void {
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(
+    `INSERT INTO skills_log (skill_name, action, agent_id, chat_id, source_turn, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(skillName, action, agentId, chatId, sourceTurn ?? null, now);
+}
+
+export function getSkillHistory(skillName?: string, limit = 20): Array<{
+  id: number;
+  skill_name: string;
+  action: string;
+  agent_id: string;
+  chat_id: string;
+  created_at: number;
+}> {
+  if (skillName) {
+    return db.prepare(
+      `SELECT id, skill_name, action, agent_id, chat_id, created_at FROM skills_log WHERE skill_name = ? ORDER BY created_at DESC LIMIT ?`,
+    ).all(skillName, limit) as Array<{ id: number; skill_name: string; action: string; agent_id: string; chat_id: string; created_at: number }>;
+  }
+  return db.prepare(
+    `SELECT id, skill_name, action, agent_id, chat_id, created_at FROM skills_log ORDER BY created_at DESC LIMIT ?`,
+  ).all(limit) as Array<{ id: number; skill_name: string; action: string; agent_id: string; chat_id: string; created_at: number }>;
 }
 
 /**

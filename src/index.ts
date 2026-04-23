@@ -23,6 +23,7 @@ import { registerHealthDb } from './health.js';
 import { registerSessionDb } from './session-compaction.js';
 import { startHealthMonitor, stopHealthMonitor } from './health.js';
 import { loadPlugins, shutdownPlugins } from './plugins.js';
+import { syncMcpToClaudeSettings } from './mcp-config.js';
 
 // Parse --agent flag
 const agentFlagIndex = process.argv.indexOf('--agent');
@@ -162,6 +163,9 @@ async function main(): Promise<void> {
   });
 
   initOrchestrator();
+
+  // Sync MCP server configs to Claude Code's settings
+  syncMcpToClaudeSettings();
 
   // v2: Load plugins and start health monitor (main process only)
   if (AGENT_ID === 'main') {

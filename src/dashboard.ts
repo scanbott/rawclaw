@@ -1037,6 +1037,68 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     return c.json({ enabled: supabaseEnabled, connected });
   });
 
+  // ── Skills API (Hermes-inspired) ─────────────────────────────────
+  app.get('/api/skills', async (c) => {
+    const { listSkills } = await import('./skill-manage.js');
+    const { getSkillHistory } = await import('./db.js');
+    const skills = listSkills();
+    const history = getSkillHistory(undefined, 50);
+    return c.json({ skills, history });
+  });
+
+  app.delete('/api/skills/:name', async (c) => {
+    const { deleteSkill } = await import('./skill-manage.js');
+    const { logSkillAction } = await import('./db.js');
+    const name = c.req.param('name');
+    const success = deleteSkill(name);
+    if (success) {
+      logSkillAction(name, 'delete', 'dashboard', ALLOWED_CHAT_ID);
+    }
+    return c.json({ success });
+  });
+
+  // ── MCP API ──────────────────────────────────────────────────────
+  app.get('/api/mcp/servers', async (c) => {
+    const { getMcpServers } = await import('./mcp-config.js');
+    return c.json({ servers: getMcpServers() });
+  });
+
+  app.post('/api/mcp/servers', async (c) => {
+    const { addMcpServer } = await import('./mcp-config.js');
+    const config = await c.req.json();
+    try {
+      addMcpServer(config);
+      return c.json({ success: true });
+    } catch (err) {
+      return c.json({ success: false, error: (err as Error).message }, 400);
+    }
+  });
+
+  app.delete('/api/mcp/servers/:name', async (c) => {
+    const { removeMcpServer } = await import('./mcp-config.js');
+    const success = removeMcpServer(c.req.param('name'));
+    return c.json({ success });
+  });
+
+  app.patch('/api/mcp/servers/:name/toggle', async (c) => {
+    const { toggleMcpServer } = await import('./mcp-config.js');
+    const body = await c.req.json();
+    const success = toggleMcpServer(c.req.param('name'), body.enabled);
+    return c.json({ success });
+  });
+
+  // ── Conversation Search API ──────────────────────────────────────
+  app.get('/api/search', async (c) => {
+    const { searchConversationFTS } = await import('./db.js');
+    const query = c.req.query('q') ?? '';
+    const agent = c.req.query('agent');
+    const limit = parseInt(c.req.query('limit') ?? '20');
+    const days = c.req.query('days') ? parseInt(c.req.query('days')!) : undefined;
+    if (!query) return c.json({ results: [] });
+    const results = searchConversationFTS(ALLOWED_CHAT_ID, query, agent, limit, days);
+    return c.json({ results });
+  });
+
   const server = serve({ fetch: app.fetch, port: DASHBOARD_PORT }, () => {
     logger.info({ port: DASHBOARD_PORT }, 'Dashboard server running');
   });

@@ -6,19 +6,22 @@ import {
   getOtherAgentActivity,
   getRecentConsolidations,
   getRecentHighImportanceMemories,
+  getStandingContext,
   logConversationTurn,
   pruneConversationLog,
   pruneSlackMessages,
   pruneWaMessages,
   searchConsolidations,
-  searchConversationHistory,
+  searchConversationFTS,
   searchMemories,
+  updateTrustScore,
 } from './db.js';
 import { cosineSimilarity, embedText } from './embeddings.js';
 import { generateContent, parseJsonResponse } from './gemini.js';
 import { logger } from './logger.js';
 import { ingestConversationTurn } from './memory-ingest.js';
 import { buildObsidianContext } from './obsidian.js';
+import { evaluateSkillCreation } from './skill-ingest.js';
 
 /**
  * Build a structured memory context string to prepend to the user's message.
@@ -77,6 +80,18 @@ export async function buildMemoryContext(
     const topics = safeParse(mem.topics);
     const topicStr = topics.length > 0 ? ` (${topics.join(', ')})` : '';
     memLines.push(`- [${mem.importance.toFixed(1)}] ${mem.summary}${topicStr}`);
+  }
+
+  // Layer 2.5: Standing rules and user preferences (always surfaced)
+  const standingFacts = getStandingContext(chatId, 5);
+  if (standingFacts.length > 0) {
+    for (const mem of standingFacts) {
+      if (seen.has(mem.id)) continue;
+      seen.add(mem.id);
+      summaryMap.set(mem.id, mem.summary);
+      const label = mem.category === 'standing_rule' ? 'RULE' : 'PREF';
+      memLines.push(`- [${label}] ${mem.summary}`);
+    }
   }
 
   // Layer 3: consolidation insights (semantic search with LIKE fallback)
@@ -149,15 +164,15 @@ export async function buildMemoryContext(
   // memory extraction may have compressed into a single sentence.
   const recallKeywords = /\bremember\b|\brecall\b|\byesterday\b|\blast time\b|\bwe talked\b|\bwe discussed\b|\bwhat do you know\b|\bdo you know\b|\bwhat did we\b|\bpreviously\b|\bearlier\b|\blast week\b|\bfew days\b/i;
   if (recallKeywords.test(userMessage)) {
-    const historyTurns = searchConversationHistory(chatId, userMessage, agentId, 7, 10);
-    if (historyTurns.length > 0) {
-      const historyLines = historyTurns
-        .reverse() // chronological
-        .map((t) => {
-          const daysAgo = Math.round((Date.now() / 1000 - t.created_at) / 86400);
+    const historyResults = searchConversationFTS(chatId, userMessage, agentId, 10, 30);
+    if (historyResults.length > 0) {
+      const historyLines = historyResults
+        .sort((a, b) => a.created_at - b.created_at) // chronological
+        .map((r) => {
+          const daysAgo = Math.round((Date.now() / 1000 - r.created_at) / 86400);
           const timeStr = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : `${daysAgo}d ago`;
-          const role = t.role === 'user' ? 'User' : 'You';
-          return `[${timeStr}] ${role}: ${t.content.slice(0, 300)}`;
+          const role = r.role === 'user' ? 'User' : 'You';
+          return `[${timeStr}] ${role}: ${r.snippet}`;
         });
       parts.push(`[Conversation history recall]\n${historyLines.join('\n')}\n[End conversation history]`);
     }
@@ -195,6 +210,11 @@ export function saveConversationTurn(
   // This runs async and never blocks the user's response
   void ingestConversationTurn(chatId, userMessage, claudeResponse, agentId).catch((err) => {
     logger.error({ err }, 'Memory ingestion fire-and-forget failed');
+  });
+
+  // Fire-and-forget: evaluate whether this turn should create a reusable skill
+  void evaluateSkillCreation(chatId, userMessage, claudeResponse, agentId).catch((err) => {
+    logger.error({ err }, 'Skill evaluation fire-and-forget failed');
   });
 }
 
@@ -256,6 +276,16 @@ ${memoryList}`;
     if (!usefulIds || !Array.isArray(usefulIds)) return;
 
     batchUpdateMemoryRelevance(surfacedMemoryIds, new Set(usefulIds));
+
+    // Adjust trust scores based on relevance feedback
+    const usefulSet = new Set(usefulIds);
+    for (const id of surfacedMemoryIds) {
+      if (usefulSet.has(id)) {
+        updateTrustScore(id, 0.1);   // useful → trust up
+      } else {
+        updateTrustScore(id, -0.05); // surfaced but unused → trust down
+      }
+    }
   } catch {
     // Non-fatal, never block
   }

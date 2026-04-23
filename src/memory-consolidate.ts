@@ -6,6 +6,7 @@ import {
   saveConsolidationEmbedding,
   supersedeMemory,
   updateMemoryConnections,
+  updateTrustScore,
 } from './db.js';
 import { embedText } from './embeddings.js';
 import { logger } from './logger.js';
@@ -155,9 +156,11 @@ export async function runConsolidation(chatId: string): Promise<void> {
           );
         }
         supersedeMemory(staleId, supersededBy);
+        // Zero out trust on the superseded memory
+        updateTrustScore(staleId, -1.0);
         logger.info(
           { staleId, supersededBy, reason: contra.reason },
-          'Memory superseded (contradiction resolved)',
+          'Memory superseded (contradiction resolved, trust zeroed)',
         );
       }
     }

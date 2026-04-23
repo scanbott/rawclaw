@@ -74,6 +74,8 @@ function makeMemory(overrides: Record<string, unknown> = {}) {
     consolidated: 0,
     pinned: 0,
     embedding: null,
+    category: null,
+    trust_score: 0.5,
     created_at: 100,
     accessed_at: 100,
     ...overrides,
