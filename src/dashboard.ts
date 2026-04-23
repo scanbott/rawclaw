@@ -62,6 +62,14 @@ import {
 } from './agent-create.js';
 import { processMessageFromDashboard } from './bot.js';
 import { getDashboardHtml } from './dashboard-html.js';
+import {
+  getLifeOSHubHtml,
+  getLifeOSSellingHtml,
+  getLifeOSRecruitingHtml,
+  getLifeOSBrandHtml,
+  getLifeOSPersonalHtml,
+  getLifeOSAgentsHtml,
+} from './lifeos-html.js';
 import { logger } from './logger.js';
 import { getTelegramConnected, getBotInfo, chatEvents, getIsProcessing, abortActiveQuery, ChatEvent } from './state.js';
 
@@ -201,8 +209,16 @@ export function startDashboard(botApi?: Api<RawApi>): void {
     await next();
   });
 
-  // Serve dashboard HTML (no token passed to HTML anymore)
-  app.get('/', (c) => {
+  // Life OS hub (root page)
+  app.get('/', (c) => c.html(getLifeOSHubHtml()));
+  app.get('/selling', (c) => c.html(getLifeOSSellingHtml()));
+  app.get('/recruiting', (c) => c.html(getLifeOSRecruitingHtml()));
+  app.get('/brand', (c) => c.html(getLifeOSBrandHtml()));
+  app.get('/personal', (c) => c.html(getLifeOSPersonalHtml()));
+  app.get('/agents', (c) => c.html(getLifeOSAgentsHtml()));
+
+  // Original rawclaw AI dashboard (moved to /ai)
+  app.get('/ai', (c) => {
     const chatId = c.req.query('chatId') || '';
     return c.html(getDashboardHtml('', chatId));
   });
@@ -1002,6 +1018,17 @@ export function startDashboard(botApi?: Api<RawApi>): void {
   app.get('/api/sessions/config', async (c) => {
     const { getCompactionConfig } = await import('./session-compaction.js');
     return c.json(getCompactionConfig());
+  });
+
+  // Life OS quick stats
+  app.get('/api/stats', async (c) => {
+    const { getMemoryCount } = await import('./db.js');
+    const { listSkills } = await import('./skill-manage.js');
+    const memCount = getMemoryCount();
+    const skills = listSkills();
+    const tasks = getAllScheduledTasks();
+    const uptime = Math.floor(process.uptime());
+    return c.json({ memories: memCount, skills: skills.length, tasks: tasks.length, uptimeSeconds: uptime });
   });
 
   // Plugins
